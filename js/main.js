@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=43';
+import { initTutorial } from './tutorial.js?v=44';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=43';
+import { defaultSystemsData } from './defaultSystems.js?v=44';
 
 document.addEventListener("DOMContentLoaded", async () => {
     const db = new OrbiMindDB();
@@ -1546,8 +1546,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (index !== -1) {
                         const parent = node.parentNode;
                         if (!parent) return;
-                        const tag = parent.tagName.toUpperCase();
-                        if (tag === "SCRIPT" || tag === "STYLE" || parent.closest('.katex') || parent.closest('.katex-display')) {
+                        const tag = (parent.tagName || "").toUpperCase();
+                        const isInsideKatex = typeof parent.closest === "function" && 
+                            (parent.closest('.katex') || parent.closest('.katex-display'));
+                        if (tag === "SCRIPT" || tag === "STYLE" || isInsideKatex) {
                             return;
                         }
                         
