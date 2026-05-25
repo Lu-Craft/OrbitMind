@@ -50,6 +50,9 @@ export class SpaceEngine {
         this.alienScanUfoPos = { x: 0, y: 0 };
         this.alienScanStartPos = { x: 0, y: 0 };
         this.drawUfoBeam = false;
+        this.activeScanPlanetPos = null;
+        this.activeScanPlanetRadius = 0;
+        this.activeScanProgress = 0;
         
         // Interacción
         this.isDragging = false;
@@ -580,6 +583,7 @@ export class SpaceEngine {
             if (this.alienScanTimer >= this.alienScanDuration) {
                 this.alienScanActive = false;
                 this.followedNode = null;
+                this.activeScanPlanetPos = null;
             } else {
                 const totalNodes = this.alienScanNodes.length;
                 if (totalNodes > 0) {
@@ -588,52 +592,84 @@ export class SpaceEngine {
                     const segmentIndex = Math.floor(progress);
                     const segmentProgress = progress - segmentIndex; // 0 a 1
 
+                    const hoverOffset = -55;
+
                     let startPos = { x: 0, y: 0 };
                     if (segmentIndex === 0) {
                         startPos = this.alienScanStartPos;
                     } else {
                         const prevNode = this.alienScanNodes[segmentIndex - 1];
-                        startPos = prevNode ? this.getNodeAbsolutePosition(prevNode) : this.alienScanStartPos;
+                        if (prevNode) {
+                            const prevPos = this.getNodeAbsolutePosition(prevNode);
+                            startPos = { x: prevPos.x, y: prevPos.y + hoverOffset };
+                        } else {
+                            startPos = this.alienScanStartPos;
+                        }
                     }
 
                     const targetNode = this.alienScanNodes[Math.min(segmentIndex, totalNodes - 1)];
-                    const targetPos = targetNode ? this.getNodeAbsolutePosition(targetNode) : { x: 0, y: 0 };
+                    let targetPos = { x: 0, y: 0 };
+                    if (targetNode) {
+                        const nodePos = this.getNodeAbsolutePosition(targetNode);
+                        targetPos = { x: nodePos.x, y: nodePos.y + hoverOffset };
+                    } else {
+                        targetPos = { x: this.alienScanStartPos.x, y: this.alienScanStartPos.y };
+                    }
 
                     // Interpolación de vuelo y escaneo:
                     // 65% del tiempo viaja al planeta. 35% escanea/hover.
                     let interpT = 0;
-                    if (segmentProgress < 0.65) {
-                        const normT = segmentProgress / 0.65;
-                        // Smooth step
-                        interpT = normT * normT * (3 - 2 * normT);
+                    const travelRatio = 0.65;
+                    if (segmentProgress < travelRatio) {
+                        const normT = segmentProgress / travelRatio;
+                        // Curva ease-out cúbica
+                        interpT = 1.0 - Math.pow(1.0 - normT, 3);
                         this.drawUfoBeam = false;
+                        this.activeScanPlanetPos = null;
                     } else {
                         interpT = 1.0;
                         this.drawUfoBeam = true;
+                        if (targetNode) {
+                            this.activeScanPlanetPos = this.getNodeAbsolutePosition(targetNode);
+                            this.activeScanPlanetRadius = this.getNodeRadius(targetNode);
+                            this.activeScanProgress = (segmentProgress - travelRatio) / (1.0 - travelRatio);
+                        }
                     }
 
                     this.alienScanUfoPos.x = startPos.x + (targetPos.x - startPos.x) * interpT;
                     this.alienScanUfoPos.y = startPos.y + (targetPos.y - startPos.y) * interpT;
 
-                    // Centrar suavemente la cámara en la posición del ovni
+                    // Centrar suavemente la cámara en la posición del planeta (compensando el offset vertical del ovni)
+                    const cameraTargetY = this.alienScanUfoPos.y - hoverOffset;
                     const targetPanX = -this.alienScanUfoPos.x * this.zoom;
-                    const targetPanY = -this.alienScanUfoPos.y * this.zoom;
+                    const targetPanY = -cameraTargetY * this.zoom;
                     this.panX += (targetPanX - this.panX) * 14 * delta;
                     this.panY += (targetPanY - this.panY) * 14 * delta;
 
                     // Zoom dinámico cinemático: zoom out al viajar, zoom in al escanear
                     this.targetZoom = this.drawUfoBeam ? 1.35 : 0.72;
 
-                    // Emitir rastro de polvo de estrellas parpadeante del OVNI en movimiento
-                    if (Math.random() < 0.4) {
-                        const colors = ["#00ff87", "#00f2fe", "#ffffff", "#ffd600"];
-                        const color = colors[Math.floor(Math.random() * colors.length)];
-                        // Instanciar partícula y empujarla al motor
-                        this.particles.push(new Particle(
-                            this.alienScanUfoPos.x + (Math.random() - 0.5) * 8,
-                            this.alienScanUfoPos.y + 4 + (Math.random() - 0.5) * 4,
-                            color
-                        ));
+                    // Emitir rastro de polvo de estrellas o partículas de escaneo del OVNI
+                    if (this.drawUfoBeam) {
+                        // Partículas de escaneo descendiendo desde el OVNI hacia el planeta
+                        if (Math.random() < 0.6) {
+                            this.particles.push(new Particle(
+                                this.alienScanUfoPos.x + (Math.random() - 0.5) * 20,
+                                this.alienScanUfoPos.y + 10 + Math.random() * 45,
+                                "#00ff87"
+                            ));
+                        }
+                    } else {
+                        // Rastro de vuelo multicolor
+                        if (Math.random() < 0.45) {
+                            const colors = ["#00ff87", "#00f2fe", "#ffffff", "#ffd600"];
+                            const color = colors[Math.floor(Math.random() * colors.length)];
+                            this.particles.push(new Particle(
+                                this.alienScanUfoPos.x + (Math.random() - 0.5) * 8,
+                                this.alienScanUfoPos.y + 4 + (Math.random() - 0.5) * 4,
+                                color
+                            ));
+                        }
                     }
                 }
             }
@@ -767,9 +803,20 @@ export class SpaceEngine {
             }
         });
 
-        // Guardar contexto para aplicar Zoom y Pan (Mundo)
+        // Guardar contexto para aplicar Zoom y Pan (Mundo) con temblor de cámara
         this.ctx.save();
-        this.ctx.translate(this.canvas.width / 2 - this.centerShiftX + this.panX, this.canvas.height / 2 + this.centerShiftY + this.panY);
+        
+        let shakeX = 0;
+        let shakeY = 0;
+        if (this.alienScanActive && this.drawUfoBeam) {
+            shakeX = (Math.random() - 0.5) * 1.5;
+            shakeY = (Math.random() - 0.5) * 1.5;
+        }
+
+        this.ctx.translate(
+            this.canvas.width / 2 - this.centerShiftX + this.panX + shakeX, 
+            this.canvas.height / 2 + this.centerShiftY + this.panY + shakeY
+        );
         this.ctx.scale(this.zoom, this.zoom);
 
         // Dibujar onda de escaneo de radar alíen
@@ -784,6 +831,26 @@ export class SpaceEngine {
             this.ctx.beginPath();
             this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
             this.ctx.stroke();
+            this.ctx.restore();
+        }
+
+        // Anillos concéntricos expansivos de radar sobre el planeta siendo escaneado actualmente
+        if (this.alienScanActive && this.activeScanPlanetPos) {
+            this.ctx.save();
+            this.ctx.shadowBlur = 12;
+            this.ctx.shadowColor = "#00ff87";
+            const baseRadius = this.activeScanPlanetRadius + 5;
+            const progress = this.activeScanProgress; // 0 a 1
+            for (let i = 0; i < 3; i++) {
+                const ringProgress = (progress + i * 0.33) % 1.0;
+                const ringRadius = baseRadius + ringProgress * 45;
+                const ringOpacity = (1.0 - ringProgress) * 0.85;
+                this.ctx.strokeStyle = `rgba(0, 255, 135, ${ringOpacity})`;
+                this.ctx.lineWidth = 2.0 * (1.0 - ringProgress * 0.5);
+                this.ctx.beginPath();
+                this.ctx.arc(this.activeScanPlanetPos.x, this.activeScanPlanetPos.y, ringRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
             this.ctx.restore();
         }
 
@@ -1052,7 +1119,6 @@ export class SpaceEngine {
                 this.ctx.lineWidth = outlineWidth;
                 this.ctx.lineJoin = "round";
                 this.ctx.strokeText(node.title, pos.x, pos.y + r + 8);
-                
                 // Rellenar Texto
                 this.ctx.fillStyle = textFill;
                 this.ctx.fillText(node.title, pos.x, pos.y + r + 8);
@@ -1061,7 +1127,7 @@ export class SpaceEngine {
             }
         });
 
-        // Dibujar trayectoria del escaneo (línea punteada luminosa verde)
+        // Dibujar trayectoria del escaneo (línea punteada de vuelo del OVNI conectando hover points)
         if (this.alienScanActive && this.alienScanNodes.length > 0) {
             this.ctx.save();
             this.ctx.strokeStyle = "rgba(0, 255, 135, 0.38)";
@@ -1072,9 +1138,10 @@ export class SpaceEngine {
             this.ctx.lineDashOffset = -time * 0.015;
             this.ctx.beginPath();
             this.ctx.moveTo(this.alienScanStartPos.x, this.alienScanStartPos.y);
+            const hoverOffset = -55;
             this.alienScanNodes.forEach(node => {
                 const pos = this.getNodeAbsolutePosition(node);
-                this.ctx.lineTo(pos.x, pos.y);
+                this.ctx.lineTo(pos.x, pos.y + hoverOffset);
             });
             this.ctx.stroke();
             this.ctx.restore();
@@ -2354,13 +2421,18 @@ export class SpaceEngine {
         this.alienScanTimer = 0;
         this.alienScanDuration = duration;
 
-        // La posición inicial es el centro del sistema
+        // La posición inicial es el centro del sistema con offset de hover
         const centerNode = this.nodes.find(n => n.id === this.currentParentId);
         const centerPos = centerNode ? this.getNodeAbsolutePosition(centerNode) : { x: 0, y: 0 };
-        this.alienScanUfoPos = { ...centerPos };
-        this.alienScanStartPos = { ...centerPos };
+        
+        const hoverOffset = -55;
+        this.alienScanStartPos = { x: centerPos.x, y: centerPos.y + hoverOffset };
+        this.alienScanUfoPos = { ...this.alienScanStartPos };
 
         this.followedNode = null; // Quitar seguimiento para que la cámara siga al OVNI
+        this.activeScanPlanetPos = null;
+        this.activeScanPlanetRadius = 0;
+        this.activeScanProgress = 0;
     }
 
     drawAlienUFO(ctx, x, y, time) {
@@ -2373,24 +2445,26 @@ export class SpaceEngine {
         if (this.drawUfoBeam) {
             const beamPulse = 1.0 + Math.sin(time * 0.025) * 0.12;
             ctx.save();
-            const grad = ctx.createLinearGradient(0, 0, 0, 90);
-            grad.addColorStop(0, "rgba(0, 255, 135, 0.45)");
-            grad.addColorStop(0.5, "rgba(0, 255, 135, 0.2)");
+            const grad = ctx.createLinearGradient(0, 0, 0, 75);
+            grad.addColorStop(0, "rgba(0, 255, 135, 0.55)");
+            grad.addColorStop(0.5, "rgba(0, 255, 135, 0.25)");
             grad.addColorStop(1, "rgba(0, 255, 135, 0.0)");
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.moveTo(0, 0);
-            ctx.lineTo(-24 * beamPulse, 85);
-            ctx.lineTo(24 * beamPulse, 85);
+            ctx.lineTo(-20 * beamPulse, 75);
+            ctx.lineTo(20 * beamPulse, 75);
             ctx.closePath();
             ctx.fill();
             
-            // Anillo de escaneo
-            ctx.strokeStyle = "rgba(0, 255, 135, 0.8)";
-            ctx.lineWidth = 1.5;
-            ctx.setLineDash([2, 4]);
+            // Anillo de escaneo en la base del haz sobre el planeta (a y = 65 en escala local del ovni)
+            const ringPulse = 1.0 + Math.sin(time * 0.03) * 0.15;
+            ctx.strokeStyle = "rgba(0, 255, 135, 0.85)";
+            ctx.lineWidth = 2.0;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#00ff87";
             ctx.beginPath();
-            ctx.ellipse(0, 25, 20 * beamPulse, 6 * beamPulse, 0, 0, Math.PI * 2);
+            ctx.ellipse(0, 65, 18 * ringPulse, 6 * ringPulse, 0, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
         }

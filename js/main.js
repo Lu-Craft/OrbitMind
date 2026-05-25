@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=45';
+import { initTutorial } from './tutorial.js?v=46';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=45';
+import { defaultSystemsData } from './defaultSystems.js?v=46';
 
 document.addEventListener("DOMContentLoaded", async () => {
     // PWA Cache Buster: force hard reload if script query version changes
@@ -2309,9 +2309,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         playScanSound();
 
         // 2. Activar onda de radar en canvas y animación UFO
+        const durationPerNode = 2200; // 2.2 segundos por nodo es extremadamente fluido y cinemático
+        const totalDuration = scanPath.length * durationPerNode;
         engine.scanPulseActive = true;
         engine.scanPulseProgress = 0;
-        engine.startAlienScanAnimation(scanPath, 1800);
+        engine.startAlienScanAnimation(scanPath, totalDuration);
 
         // 3. Mostrar estado de escaneo y telemetría de HUD
         alienSearchPanel.classList.add("scanning");
@@ -2330,7 +2332,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         const sectors = ["SECTOR_ALPHA", "SECTOR_ORBITAL", "DEEP_SPACE", "ASTEROID_BELT", "HYPER_SPACE", "COGNITIVE_GRID"];
         const progressInterval = setInterval(() => {
-            progress += 5;
+            progress += 2; // incremento de 2% para mayor suavidad
             if (progress <= 100) {
                 scanningProgressFill.style.width = progress + "%";
             }
@@ -2339,9 +2341,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const randHex = Math.floor(Math.random() * 65535).toString(16).toUpperCase();
                 telemetryStatus.textContent = `LOC: ${randSector} [0x${randHex}]`;
             }
-        }, 80);
+        }, totalDuration / 50); // 50 pasos hasta completar 100%
 
-        await new Promise(resolve => setTimeout(resolve, 1800));
+        await new Promise(resolve => setTimeout(resolve, totalDuration));
         clearInterval(progressInterval);
 
         if (telemetryStatus) telemetryStatus.textContent = "SYS.SCAN: COMPLETE";
