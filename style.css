@@ -3456,20 +3456,26 @@ body, html {
 .alien-text-helper {
     position: absolute;
     display: flex;
+    flex-direction: column; /* Vertical layout: bubble on top, avatar on bottom */
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     z-index: 1000;
     pointer-events: none;
     opacity: 0;
-    transform: translateY(15px) scale(0.9);
+    /* Use translateX(-50%) to center horizontally at the target 'left' coordinate */
+    transform: translateX(-50%) translateY(15px) scale(0.9);
     transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), 
                 transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .alien-text-helper.show {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateX(-50%) translateY(0) scale(1);
     animation: alienBobbing 3.5s ease-in-out infinite;
+}
+
+.alien-text-helper.position-below {
+    flex-direction: column-reverse; /* Avatar on top, bubble on bottom */
 }
 
 .alien-helper-avatar {
@@ -3499,29 +3505,31 @@ body, html {
     max-width: 200px;
     position: relative;
     letter-spacing: 0.5px;
-    white-space: nowrap;
+    text-align: center;
 }
 
-/* Arrow for bubble */
+/* Arrow pointing down (default: bubble is on top) */
 .alien-helper-bubble::after {
     content: '';
     position: absolute;
-    left: -6px;
-    top: 50%;
-    transform: translateY(-50%) rotate(45deg);
+    left: 50%;
+    bottom: -6px;
+    transform: translateX(-50%) rotate(45deg);
     width: 8px;
     height: 8px;
     background: rgba(10, 12, 30, 0.92);
-    border-left: 1.5px solid #00f2fe;
+    border-right: 1.5px solid #00f2fe;
     border-bottom: 1.5px solid #00f2fe;
 }
 
-.alien-helper-bubble.left-bubble::after {
-    left: auto;
-    right: -6px;
-    border-left: none;
+/* Arrow pointing up (when bubble is on bottom) */
+.alien-text-helper.position-below .alien-helper-bubble::after {
+    bottom: auto;
+    top: -6px;
+    transform: translateX(-50%) rotate(45deg);
+    border-right: none;
     border-bottom: none;
-    border-right: 1.5px solid #00f2fe;
+    border-left: 1.5px solid #00f2fe;
     border-top: 1.5px solid #00f2fe;
 }
 

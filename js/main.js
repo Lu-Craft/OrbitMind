@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=42';
+import { initTutorial } from './tutorial.js?v=43';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=42';
+import { defaultSystemsData } from './defaultSystems.js?v=43';
 
 document.addEventListener("DOMContentLoaded", async () => {
     const db = new OrbiMindDB();
@@ -1493,9 +1493,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (container) {
                         highlightSpan.scrollIntoView({ behavior: "smooth", block: "center" });
                     }
-                    createAlienTextHelper(highlightSpan);
+                    // Wait for layout to settle and scroll to execute before positioning the helper
+                    requestAnimationFrame(() => {
+                        createAlienTextHelper(highlightSpan);
+                    });
                 }
-            }, 150);
+            }, 250);
         }
     }
 
@@ -1608,17 +1611,17 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         studyContent.appendChild(helper);
 
-        // Position the helper relative to studyContent
-        const spanRect = highlightSpan.getBoundingClientRect();
-        const contentRect = studyContent.getBoundingClientRect();
-
-        const top = spanRect.top - contentRect.top;
-        const left = spanRect.left - contentRect.left;
+        // Position the helper using static layout offsets relative to studyContent
+        const top = highlightSpan.offsetTop;
+        const left = highlightSpan.offsetLeft;
+        const width = highlightSpan.offsetWidth;
+        const height = highlightSpan.offsetHeight;
+        const contentWidth = studyContent.offsetWidth;
 
         // Horizontally center relative to the highlighted span
-        let helperLeft = left + spanRect.width / 2;
+        let helperLeft = left + width / 2;
         // Clamp to prevent horizontal overflow outside the container
-        helperLeft = Math.max(110, Math.min(contentRect.width - 110, helperLeft));
+        helperLeft = Math.max(110, Math.min(contentWidth - 110, helperLeft));
         helper.style.left = `${helperLeft}px`;
 
         // Measure height after appending to position vertically above the span
@@ -1627,7 +1630,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         // If it overflows the top of the container, position it below instead
         if (helperTop < 0) {
-            helperTop = top + spanRect.height + 10;
+            helperTop = top + height + 10;
             helper.classList.add("position-below");
         } else {
             helper.classList.remove("position-below");
