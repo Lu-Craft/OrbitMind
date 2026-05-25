@@ -12,6 +12,43 @@ import {
 import { defaultSystemsData } from './defaultSystems.js?v=44';
 
 document.addEventListener("DOMContentLoaded", async () => {
+    // PWA Cache Buster: force hard reload if script query version changes
+    try {
+        const currentScript = document.currentScript || document.querySelector('script[src*="main.js"]');
+        const scriptUrl = currentScript ? currentScript.src : '';
+        const versionMatch = scriptUrl.match(/\?v=(\d+)/);
+        const currentVersion = versionMatch ? versionMatch[1] : '';
+        
+        if (currentVersion) {
+            const savedVersion = localStorage.getItem("orbimind_app_version");
+            if (savedVersion && savedVersion !== currentVersion) {
+                localStorage.setItem("orbimind_app_version", currentVersion);
+                
+                // Clear service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (const registration of registrations) {
+                        registration.unregister();
+                    }
+                }
+                // Clear caches
+                if ('caches' in window) {
+                    const cacheNames = await caches.keys();
+                    for (const name of cacheNames) {
+                        await caches.delete(name);
+                    }
+                }
+                
+                // Force hard reload
+                window.location.reload(true);
+                return;
+            }
+            localStorage.setItem("orbimind_app_version", currentVersion);
+        }
+    } catch (e) {
+        console.warn("[CacheBuster] Error during cache bust check:", e);
+    }
+
     const db = new OrbiMindDB();
     await db.init();
 
@@ -1345,7 +1382,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         studyContent.style.setProperty('--study-font-size', '16px');
     }
 
-    function navigateToNode(targetNode, searchQuery = null) {
+    function navigateToNode(targetNode, searchQuery = null, isFuzzy = false) {
         if (!targetNode) return;
 
         // Perform complete orbit/focus navigation first
@@ -1376,10 +1413,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         engine.followedNode = targetNode;
         openSidebar(targetNode);
         updateAddButtons();
-        openStudyWorkspace(targetNode, true, searchQuery);
+        openStudyWorkspace(targetNode, true, searchQuery, isFuzzy);
     }
 
-    function openStudyWorkspace(node, keepTimer = false, searchQuery = null) {
+    function openStudyWorkspace(node, keepTimer = false, searchQuery = null, isFuzzy = false) {
         if (!node) return;
 
         if (!keepTimer) {
@@ -1487,7 +1524,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (searchQuery) {
             // Wait a brief moment for the browser to lay out the visible workspace
             setTimeout(() => {
-                const highlightSpan = highlightSearchQueryInStudy(searchQuery);
+                const highlightSpan = highlightSearchQueryInStudy(searchQuery, isFuzzy);
                 if (highlightSpan) {
                     const container = document.querySelector(".study-document-container");
                     if (container) {
@@ -1519,30 +1556,54 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     }
 
-    function highlightSearchQueryInStudy(query) {
-        if (!query) return null;
-        
-        // Strategy 1: Search exact query case-insensitively
-        let found = highlightTerm(query);
-        if (found) return studyContent.querySelector(".alien-search-highlight");
-        
-        // Strategy 2: Search individual words (longer than 2 chars)
-        const words = query.split(/\s+/).filter(w => w.length > 2);
-        for (const word of words) {
-            found = highlightTerm(word);
-            if (found) return studyContent.querySelector(".alien-search-highlight");
+    function highlightSearchQueryInStudy(query, isFuzzy = false) {
+        try {
+            if (!query) return null;
+            
+            // Strategy 1: Search exact query case-insensitively (or accent-insensitively)
+            let found = highlightTerm(query);
+            if (found) {
+                const span = studyContent.querySelector(".alien-search-highlight");
+                if (span && isFuzzy) {
+                    span.classList.add("fuzzy-highlight");
+                }
+                return span;
+            }
+            
+            // Strategy 2: Search individual words (longer than 2 chars)
+            const words = query.split(/\s+/).filter(w => w.length > 2);
+            for (const word of words) {
+                found = highlightTerm(word);
+                if (found) {
+                    const span = studyContent.querySelector(".alien-search-highlight");
+                    if (span && isFuzzy) {
+                        span.classList.add("fuzzy-highlight");
+                    }
+                    return span;
+                }
+            }
+            
+            return null;
+        } catch (err) {
+            console.error("[AlienSearch] Error in highlightSearchQueryInStudy:", err);
+            return null;
         }
-        
-        return null;
+
+        function indexOfIgnoreAccents(haystack, needle) {
+            const normHaystack = normalizeText(haystack);
+            const normNeedle = normalizeText(needle);
+            return normHaystack.indexOf(normNeedle);
+        }
 
         function highlightTerm(term) {
-            const normalizedQuery = term.toLowerCase();
+            const normalizedQuery = normalizeText(term);
+            if (!normalizedQuery) return false;
             let matchesFound = false;
 
             function traverse(node) {
                 if (node.nodeType === Node.TEXT_NODE) {
                     const textContent = node.textContent;
-                    const index = textContent.toLowerCase().indexOf(normalizedQuery);
+                    const index = indexOfIgnoreAccents(textContent, normalizedQuery);
                     if (index !== -1) {
                         const parent = node.parentNode;
                         if (!parent) return;
@@ -1590,70 +1651,78 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function createAlienTextHelper(highlightSpan) {
-        const existingHelper = studyContent.querySelector(".alien-text-helper");
-        if (existingHelper) existingHelper.remove();
+        try {
+            const existingHelper = studyContent.querySelector(".alien-text-helper");
+            if (existingHelper) existingHelper.remove();
 
-        const helper = document.createElement("div");
-        helper.className = "alien-text-helper";
-        
-        const phrases = [
-            "¡Aquí está, humano!",
-            "¡Encontré la señal!",
-            "¡Apuntes localizados!",
-            "¡Telemetría exacta!",
-            "¡Rastreo exitoso!"
-        ];
-        const phrase = phrases[Math.floor(Math.random() * phrases.length)];
-
-        // Order: bubble on top, avatar on bottom
-        helper.innerHTML = `
-            <div class="alien-helper-bubble">${phrase}</div>
-            <div class="alien-helper-avatar">👽</div>
-        `;
-        
-        studyContent.appendChild(helper);
-
-        // Position the helper using static layout offsets relative to studyContent
-        const top = highlightSpan.offsetTop;
-        const left = highlightSpan.offsetLeft;
-        const width = highlightSpan.offsetWidth;
-        const height = highlightSpan.offsetHeight;
-        const contentWidth = studyContent.offsetWidth;
-
-        // Horizontally center relative to the highlighted span
-        let helperLeft = left + width / 2;
-        // Clamp to prevent horizontal overflow outside the container
-        helperLeft = Math.max(110, Math.min(contentWidth - 110, helperLeft));
-        helper.style.left = `${helperLeft}px`;
-
-        // Measure height after appending to position vertically above the span
-        const helperHeight = helper.offsetHeight;
-        let helperTop = top - helperHeight - 10;
-        
-        // If it overflows the top of the container, position it below instead
-        if (helperTop < 0) {
-            helperTop = top + height + 10;
-            helper.classList.add("position-below");
-        } else {
-            helper.classList.remove("position-below");
-        }
-        
-        helper.style.top = `${helperTop}px`;
-
-        requestAnimationFrame(() => {
-            helper.classList.add("show");
-        });
-
-        setTimeout(() => {
-            helper.classList.remove("show");
+            const helper = document.createElement("div");
+            helper.className = "alien-text-helper";
             
-            const highlights = studyContent.querySelectorAll(".alien-search-highlight");
-            highlights.forEach(span => span.classList.add("fade-out"));
+            const phrases = [
+                "¡Aquí está, humano!",
+                "¡Encontré la señal!",
+                "¡Apuntes localizados!",
+                "¡Telemetría exacta!",
+                "¡Rastreo exitoso!"
+            ];
+            const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+            // Order: bubble on top, avatar on bottom
+            helper.innerHTML = `
+                <div class="alien-helper-bubble">${phrase}</div>
+                <div class="alien-helper-avatar">👽</div>
+            `;
+            
+            studyContent.appendChild(helper);
+
+            // CALCULO MILIMÉTRICO DE COORDENADAS RELATIVAS
+            const spanRect = highlightSpan.getBoundingClientRect();
+            const contentRect = studyContent.getBoundingClientRect();
+
+            // Posición left relativa respecto a studyContent
+            const left = spanRect.left - contentRect.left + studyContent.scrollLeft;
+            // Posición top relativa respecto a studyContent
+            const top = spanRect.top - contentRect.top + studyContent.scrollTop;
+
+            const width = spanRect.width;
+            const height = spanRect.height;
+            const contentWidth = studyContent.offsetWidth;
+
+            // Centrado horizontal
+            let helperLeft = left + width / 2;
+            helperLeft = Math.max(110, Math.min(contentWidth - 110, helperLeft));
+            helper.style.left = `${helperLeft}px`;
+
+            // Medir altura
+            const helperHeight = helper.offsetHeight;
+            let helperTop = top - helperHeight - 10;
+            
+            if (helperTop < 0) {
+                helperTop = top + height + 10;
+                helper.classList.add("position-below");
+            } else {
+                helper.classList.remove("position-below");
+            }
+            
+            helper.style.top = `${helperTop}px`;
+
+            requestAnimationFrame(() => {
+                helper.classList.add("show");
+            });
 
             setTimeout(() => {
-                removeAlienHighlights();
-            }, 500);
-        }, 5000);
+                helper.classList.remove("show");
+                
+                const highlights = studyContent.querySelectorAll(".alien-search-highlight");
+                highlights.forEach(span => span.classList.add("fade-out"));
+
+                setTimeout(() => {
+                    removeAlienHighlights();
+                }, 500);
+            }, 5000);
+        } catch (err) {
+            console.error("[AlienSearch] Error in createAlienTextHelper:", err);
+        }
     }
 
     function updateStudyQuickNav(currentNode) {
@@ -2408,7 +2477,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                 `;
 
                 item.addEventListener("click", () => {
-                    navigateToNode(node, query);
+                    const termToHighlight = itemData.isFuzzy ? (itemData.matchedWord || query) : query;
+                    navigateToNode(node, termToHighlight, itemData.isFuzzy);
                     engine.selectedNode = node;
                     engine.followedNode = node;
                     

@@ -3547,6 +3547,20 @@ body, html {
     display: inline;
 }
 
+/* Resaltado amarillo neón para sugerencias difusas */
+.alien-search-highlight.fuzzy-highlight {
+    background: rgba(255, 235, 59, 0.18);
+    border-bottom: 2px solid #ffeb3b;
+    color: #ffeb3b;
+    text-shadow: 0 0 8px rgba(255, 235, 59, 0.6);
+    padding: 1px 4px;
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgba(255, 235, 59, 0.25);
+    animation: neonFuzzyHighlightPulse 1.5s infinite alternate;
+    transition: all 0.4s ease;
+    display: inline;
+}
+
 .alien-search-highlight.fade-out {
     background: transparent !important;
     border-bottom-color: transparent !important;
@@ -3566,4 +3580,16 @@ body, html {
         background: rgba(0, 255, 135, 0.28);
     }
 }
+
+@keyframes neonFuzzyHighlightPulse {
+    0% {
+        box-shadow: 0 0 4px rgba(255, 235, 59, 0.2);
+        background: rgba(255, 235, 59, 0.12);
+    }
+    100% {
+        box-shadow: 0 0 12px rgba(255, 235, 59, 0.45);
+        background: rgba(255, 235, 59, 0.28);
+    }
+}
+
 
