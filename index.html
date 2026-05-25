@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            var errDiv = document.createElement('div');
+            errDiv.style.position = 'fixed';
+            errDiv.style.top = '0';
+            errDiv.style.left = '0';
+            errDiv.style.width = '100%';
+            errDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.95)';
+            errDiv.style.color = 'white';
+            errDiv.style.padding = '20px';
+            errDiv.style.zIndex = '999999';
+            errDiv.style.fontFamily = 'monospace';
+            errDiv.style.whiteSpace = 'pre-wrap';
+            errDiv.innerHTML = '<h2>🚨 Error detectado en la aplicación:</h2>' +
+                '<p><b>Mensaje:</b> ' + message + '</p>' +
+                '<p><b>Archivo:</b> ' + source + '</p>' +
+                '<p><b>Línea:</b> ' + lineno + ' | <b>Columna:</b> ' + colno + '</p>' +
+                (error && error.stack ? '<p><b>Stack:</b><br>' + error.stack + '</p>' : '');
+            document.body.appendChild(errDiv);
+            return false;
+        };
+        window.addEventListener('unhandledrejection', function(event) {
+            var message = event.reason ? (event.reason.message || event.reason) : 'Promesa rechazada sin razón';
+            var stack = event.reason && event.reason.stack ? event.reason.stack : '';
+            var errDiv = document.createElement('div');
+            errDiv.style.position = 'fixed';
+            errDiv.style.top = '0';
+            errDiv.style.left = '0';
+            errDiv.style.width = '100%';
+            errDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.95)';
+            errDiv.style.color = 'white';
+            errDiv.style.padding = '20px';
+            errDiv.style.zIndex = '999999';
+            errDiv.style.fontFamily = 'monospace';
+            errDiv.style.whiteSpace = 'pre-wrap';
+            errDiv.innerHTML = '<h2>🚨 Promesa no controlada rechazada:</h2>' +
+                '<p><b>Mensaje:</b> ' + message + '</p>' +
+                (stack ? '<p><b>Stack:</b><br>' + stack + '</p>' : '');
+            document.body.appendChild(errDiv);
+        });
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OrbiMind - Sistema Solar de Ideas</title>
+    <!-- Google Fonts: Orbitron for Sci-Fi headings, Outfit for clean UI text -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- KaTeX for beautiful math equations rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <!-- Background Space Canvas -->
+    <canvas id="spaceCanvas"></canvas>
+
+    <!-- App Overlay UI -->
+    <div class="app-container">
+        <!-- Top Navigation / Header -->
+        <header class="main-header glass-panel">
+            <div class="header-logo" id="headerLogo">
+                <div class="logo-container">
+                    <div class="logo-planet">
+                        <div class="logo-ring"></div>
+                    </div>
+                </div>
+                <span class="logo-text">OrbitMind</span>
+            </div>
+            <div class="system-selector">
+                <div class="select-hud-wrapper">
+                    <span class="select-hud-label">SISTEMA ACTIVO</span>
+                    <div class="custom-select-wrapper" id="customSystemSelect">
+                        <div class="custom-select-trigger">
+                            <span class="custom-select-text">Cargando...</span>
+                            <span class="custom-select-arrow">▼</span>
+                        </div>
+                        <div class="custom-select-options glass-panel hidden">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+                    <!-- Hidden original select for database and logic compatibility -->
+                    <select id="solarSystemSelect" style="display: none;">
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <button id="btnNewSystem" class="btn btn-secondary btn-header" title="Crear nuevo sistema solar">
+                    <span class="btn-icon">+</span> Nuevo Sistema
+                </button>
+                <button id="btnDeleteSystem" class="btn btn-danger-header btn-header" title="Eliminar sistema solar actual">
+                    <span>🗑️</span>
+                </button>
+                <button id="btnShowTutorial" class="btn btn-secondary btn-header" title="Ver tutorial guiado">
+                    <span class="btn-icon">❓</span> Ayuda
+                </button>
+                <button id="btnOpenSync" class="btn btn-secondary btn-header" title="Respaldos y copias de seguridad">
+                    <span class="btn-icon">💾</span> Respaldos
+                </button>
+            </div>
+        </header>
+
+        <!-- Left Control Bar (Floating) -->
+        <div class="floating-controls glass-panel">
+            <button id="btnPlayPause" class="control-btn active" title="Pausar/Reanudar rotación">
+                <span class="icon">⏸</span>
+            </button>
+            <button id="btnZoomIn" class="control-btn" title="Acercar">
+                <span class="icon">➕</span>
+            </button>
+            <button id="btnZoomOut" class="control-btn" title="Alejar">
+                <span class="icon">➖</span>
+            </button>
+            <button id="btnResetView" class="control-btn" title="Centrar cámara">
+                <span class="icon">🎯</span>
+            </button>
+            <button id="btnGoParent" class="control-btn disabled" title="Subir nivel orbital" disabled>
+                <span class="icon">⬆</span>
+            </button>
+            <div class="control-separator"></div>
+            <button id="btnToggleStars" class="control-btn" title="Ver estrellas activas (recordatorios)">
+                <span class="icon">⭐</span>
+                <span id="activeStarsBadge" class="stars-badge hidden">0</span>
+            </button>
+            <button id="btnOpenSearch" class="control-btn" title="Buscador Inteligente Alíen">
+                <span class="icon">👽</span>
+            </button>
+        </div>
+
+        <!-- Active Stars Collapsible Panel -->
+        <div id="activeStarsPanel" class="active-stars-panel glass-panel">
+            <div class="active-stars-header">
+                <h3>Estrellas Activas</h3>
+                <span class="active-stars-count" id="activeStarsPanelCount">0</span>
+            </div>
+            <div class="active-stars-list-wrapper">
+                <ul id="activeStarsList" class="active-stars-list">
+                    <!-- Dynamic active stars list -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Alien Search Collapsible Panel -->
+        <div id="alienSearchPanel" class="alien-search-panel glass-panel">
+            <button id="btnCloseSearch" class="close-sidebar-btn" title="Cerrar buscador">×</button>
+            <div class="alien-search-header">
+                <div class="alien-avatar-container">
+                    <div class="alien-holo-ring"></div>
+                    <div class="alien-spaceship-glass">
+                        <span class="alien-emoji">👽</span>
+                    </div>
+                    <div class="alien-spaceship-hull">
+                        <div class="alien-lights">
+                            <span class="light-dot"></span>
+                            <span class="light-dot"></span>
+                            <span class="light-dot"></span>
+                            <span class="light-dot"></span>
+                        </div>
+                    </div>
+                    <div class="alien-tractor-beam"></div>
+                </div>
+                <div class="alien-speech-bubble">
+                    <div class="speech-bubble-scanline"></div>
+                    <div class="speech-bubble-hud-corner top-left"></div>
+                    <div class="speech-bubble-hud-corner top-right"></div>
+                    <div class="speech-bubble-hud-corner bottom-left"></div>
+                    <div class="speech-bubble-hud-corner bottom-right"></div>
+                    <p id="alienSpeechText">¡Hola, humano! Soy tu guía estelar. ¿Qué información deseas buscar en este sistema solar?</p>
+                </div>
+            </div>
+            
+            <div class="search-form-group">
+                <div class="input-with-voice">
+                    <input type="text" id="alienSearchInput" class="glass-input" placeholder="Buscar palabras, conceptos, fórmulas...">
+                    <button class="btn-voice" id="voiceSearchBtn" title="Dictar búsqueda por voz" data-target="alienSearchInput">
+                        <span class="mic-icon">🎙️</span>
+                    </button>
+                </div>
+                <button id="btnRunSearch" class="btn btn-primary btn-glow search-action-btn">
+                    <span>🔍 Escanear Sistema</span>
+                </button>
+            </div>
+
+            <!-- Scanning overlay / progress bar -->
+            <div id="alienScanningState" class="alien-scanning-state hidden">
+                <div class="scanning-hud-row">
+                    <div class="radar-hud">
+                        <div class="radar-sweep"></div>
+                        <div class="radar-circle radar-circle-1"></div>
+                        <div class="radar-circle radar-circle-2"></div>
+                        <div class="radar-crosshair-h"></div>
+                        <div class="radar-crosshair-v"></div>
+                    </div>
+                    <div class="scanning-info">
+                        <span class="scanning-label">Escaneando sistema...</span>
+                        <div class="scanning-details">
+                            <span id="scanTelemetryQuery">TARGET: NONE</span>
+                            <span id="scanTelemetryStatus">SYS.SCAN: IN_PROGRESS</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="scanning-progress-bar">
+                    <div id="scanningProgressFill" class="scanning-progress-fill"></div>
+                </div>
+            </div>
+
+            <div class="search-results-wrapper">
+                <div id="searchResultsList" class="search-results-list">
+                    <!-- Dynamic results will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Node Floating Button (Bottom Center) -->
+        <div class="bottom-actions">
+            <div id="addActionsContainer" class="add-actions-container glass-panel">
+                <span class="action-label"><span class="label-prefix">Añadir a </span><strong id="activeParentName">Sol</strong>:</span>
+                <div id="addChildButtons" class="action-buttons">
+                    <!-- Dynamic buttons go here -->
+                </div>
+            </div>
+            <button id="btnNewStar" class="btn btn-secondary btn-glow" style="margin-left: 10px;"><span class="btn-icon">⭐</span><span class="btn-text"> Lanzar Estrella</span></button>
+        </div>
+
+        <!-- Right Detail Sidebar (Glassmorphism) -->
+        <aside id="detailSidebar" class="detail-sidebar glass-panel">
+            <button id="btnCloseSidebar" class="close-sidebar-btn" title="Cerrar panel">×</button>
+            
+            <div class="sidebar-content">
+                <div class="node-badge" id="sidebarNodeBadge">Sol</div>
+                
+                <div class="form-group">
+                    <label for="nodeTitle">Título del Objeto</label>
+                    <div class="input-with-voice">
+                        <input type="text" id="nodeTitle" class="glass-input" placeholder="Nombre de la idea...">
+                        <button class="btn-voice" id="voiceNodeTitle" title="Dictar título por voz" data-target="nodeTitle">
+                            <span class="mic-icon">🎙️</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group" id="nodeTypeGroup">
+                    <label for="nodeType">Tipo de Cuerpo</label>
+                    <select id="nodeType" class="glass-select">
+                        <option value="planet">Planeta (Categoría Mayor)</option>
+                        <option value="planetoid">Planetoide (Subcategoría)</option>
+                        <option value="moon">Luna (Apunte / Nota Mayor)</option>
+                        <option value="satellite">Satélite (Nota Corta / Dato Rápido)</option>
+                    </select>
+                </div>
+
+                <div class="form-group notes-group">
+                    <div class="notes-header">
+                        <label for="nodeNotes">Notas y Contenido</label>
+                        <div class="notes-tabs">
+                            <button id="tabEdit" class="tab-btn active">Editar</button>
+                            <button id="tabPreview" class="tab-btn">Vista Previa</button>
+                        </div>
+                    </div>
+                    
+                    <div class="editor-container">
+                        <div class="voice-notes-wrapper">
+                            <textarea id="nodeNotes" class="glass-textarea" placeholder="Escribe tus apuntes de estudio aquí (soporta Markdown)..."></textarea>
+                            <div class="voice-toolbar">
+                                <button class="btn-voice btn-voice-textarea" id="voiceNodeNotes" title="Dictar notas por voz" data-target="nodeNotes">
+                                    <span class="mic-icon">🎙️</span>
+                                    <span class="voice-label">Dictar voz</span>
+                                </button>
+                                <button type="button" class="btn-math-keyboard" id="btnToggleMathKeyboard" title="Teclado Matemático Científico">
+                                    <span class="math-icon">∑</span>
+                                    <span class="math-label">Teclado Matemático</span>
+                                </button>
+                            </div>
+                            <!-- Real-time Quick Math Preview -->
+                            <div id="liveMathPreview" class="live-math-preview hidden">
+                                <div class="live-math-header">
+                                    <span>Vista Rápida de Fórmulas</span>
+                                    <span class="live-indicator">● LIVE</span>
+                                </div>
+                                <div id="liveMathContent" class="live-math-content"></div>
+                            </div>
+                        </div>
+                        <div id="mathKeyboard" class="math-keyboard hidden">
+                            <div class="math-category">
+                                <span class="math-cat-title">Fórmulas y Estilos</span>
+                                <div class="math-btn-grid">
+                                    <button type="button" class="math-btn" data-snippet="$$  $$" data-offset="-3" title="Bloque de ecuación">$$ ec $$</button>
+                                    <button type="button" class="math-btn" data-snippet="$  $" data-offset="-2" title="Ecuación en línea">$ ec $</button>
+                                    <button type="button" class="math-btn" data-snippet="\frac{ }{ }" data-offset="-5" title="Fracción">\frac{a}{b}</button>
+                                    <button type="button" class="math-btn" data-snippet="^{ }" data-offset="-2" title="Exponente (Superíndice)">x²</button>
+                                    <button type="button" class="math-btn" data-snippet="_{ }" data-offset="-2" title="Subíndice">x_i</button>
+                                    <button type="button" class="math-btn" data-snippet="\sqrt{ }" data-offset="-2" title="Raíz cuadrada">√</button>
+                                </div>
+                            </div>
+                            <div class="math-category">
+                                <span class="math-cat-title">Cálculo</span>
+                                <div class="math-btn-grid">
+                                    <button type="button" class="math-btn" data-snippet="\int " data-offset="0" title="Integral">∫</button>
+                                    <button type="button" class="math-btn" data-snippet="\int_{a}^{b} " data-offset="0" title="Integral definida">∫_a^b</button>
+                                    <button type="button" class="math-btn" data-snippet="\oint " data-offset="0" title="Integral de línea cerrada (Clausius)">oint</button>
+                                    <button type="button" class="math-btn" data-snippet="\frac{d}{dx} " data-offset="0" title="Derivada">d/dx</button>
+                                    <button type="button" class="math-btn" data-snippet="\frac{\partial}{\partial } " data-offset="-2" title="Derivada parcial">∂/∂x</button>
+                                    <button type="button" class="math-btn" data-snippet="\Delta " data-offset="0" title="Delta (Incremento)">Δ</button>
+                                    <button type="button" class="math-btn" data-snippet="\delta " data-offset="0" title="Delta minúscula (Diferencial inexacta)">δ</button>
+                                    <button type="button" class="math-btn" data-snippet="\infty" data-offset="0" title="Infinito">∞</button>
+                                </div>
+                            </div>
+                            <div class="math-category">
+                                <span class="math-cat-title">Termodinámica</span>
+                                <div class="math-btn-grid">
+                                    <button type="button" class="math-btn" data-snippet="\Delta G " data-offset="0" title="Energía Libre de Gibbs">ΔG</button>
+                                    <button type="button" class="math-btn" data-snippet="\Delta H " data-offset="0" title="Entalpía">ΔH</button>
+                                    <button type="button" class="math-btn" data-snippet="\Delta S " data-offset="0" title="Entropía">ΔS</button>
+                                    <button type="button" class="math-btn" data-snippet="T " data-offset="0" title="Temperatura absoluta">T</button>
+                                    <button type="button" class="math-btn" data-snippet="P " data-offset="0" title="Presión">P</button>
+                                    <button type="button" class="math-btn" data-snippet="V " data-offset="0" title="Volumen">V</button>
+                                    <button type="button" class="math-btn" data-snippet="\mu " data-offset="0" title="Potencial químico">μ</button>
+                                    <button type="button" class="math-btn" data-snippet="\eta " data-offset="0" title="Eficiencia / Rendimiento">η</button>
+                                    <button type="button" class="math-btn" data-snippet="\Omega " data-offset="0" title="Multiplicidad de microestados">Ω</button>
+                                    <button type="button" class="math-btn" data-snippet="\beta " data-offset="0" title="Beta estadística (1/k_B T)">β</button>
+                                    <button type="button" class="math-btn" data-snippet="R " data-offset="0" title="Constante de gases ideales">R</button>
+                                    <button type="button" class="math-btn" data-snippet="k_B " data-offset="0" title="Constante de Boltzmann">k_B</button>
+                                </div>
+                            </div>
+                            <div class="math-category">
+                                <span class="math-cat-title">Operadores</span>
+                                <div class="math-btn-grid">
+                                    <button type="button" class="math-btn" data-snippet="\pi " data-offset="0" title="Pi">π</button>
+                                    <button type="button" class="math-btn" data-snippet="e " data-offset="0" title="Número de Euler">e</button>
+                                    <button type="button" class="math-btn" data-snippet="\ln( )" data-offset="-2" title="Logaritmo natural">ln</button>
+                                    <button type="button" class="math-btn" data-snippet="\log( )" data-offset="-2" title="Logaritmo base 10">log</button>
+                                    <button type="button" class="math-btn" data-snippet="\approx " data-offset="0" title="Aproximado">≈</button>
+                                    <button type="button" class="math-btn" data-snippet="\le " data-offset="0" title="Menor o igual">≤</button>
+                                    <button type="button" class="math-btn" data-snippet="\ge " data-offset="0" title="Mayor o igual">≥</button>
+                                    <button type="button" class="math-btn" data-snippet="\sum_{i} " data-offset="0" title="Sumatoria">∑</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="notesPreview" class="notes-preview hidden"></div>
+                    </div>
+                </div>
+
+                <!-- Attached Resources Section -->
+                <div class="form-group" id="attachmentsGroup">
+                    <label>Archivos y Adjuntos</label>
+                    <div class="attachments-list" id="attachmentsList">
+                        <!-- Loaded dynamically -->
+                    </div>
+                    <div class="file-upload-wrapper">
+                        <label class="btn btn-secondary btn-full">
+                            <span>📎 Adjuntar Imagen/PDF</span>
+                            <input type="file" id="fileAttachment" accept="image/*,application/pdf" style="display: none;">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="sidebar-actions">
+                    <button id="btnStudyNode" class="btn btn-success btn-glow btn-full">📖 Abrir en Modo Estudio</button>
+                    <button id="btnSaveNode" class="btn btn-primary btn-full">Guardar Cambios</button>
+                    <button id="btnDeleteNode" class="btn btn-danger btn-full">Eliminar Objeto</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- New System Modal -->
+        <div id="newSystemModal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <h2>Crear Nuevo Sistema Solar</h2>
+                <p>Cada sistema representa un tema principal de estudio (ej. Álgebra, Biología Céluar).</p>
+                <div class="form-group">
+                    <label for="newSystemName">Nombre del Sistema Solar (Sol)</label>
+                    <div class="input-with-voice">
+                        <input type="text" id="newSystemName" class="glass-input" placeholder="Nombre del Sol central...">
+                        <button class="btn-voice" id="voiceNewSystem" title="Dictar nombre por voz" data-target="newSystemName">
+                            <span class="mic-icon">🎙️</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="btnCancelModal" class="btn btn-secondary">Cancelar</button>
+                    <button id="btnCreateModal" class="btn btn-primary">Crear Sol</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Launch Shooting Star Modal -->
+        <div id="newStarModal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <h2>Lanzar Estrella Fugaz ⭐</h2>
+                <p>Escribe un tema, pregunta o recordatorio que quieras investigar más tarde. La estrella volará por la pantalla de estudio hasta que la des por estudiada.</p>
+                <div class="form-group">
+                    <label for="newStarTitle">Tema o Recordatorio Pendiente</label>
+                    <div class="input-with-voice">
+                        <input type="text" id="newStarTitle" class="glass-input" placeholder="Ej: Estudiar el ciclo de Carnot...">
+                        <button class="btn-voice" id="voiceNewStar" title="Dictar recordatorio por voz" data-target="newStarTitle">
+                            <span class="mic-icon">🎙️</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="btnCancelStarModal" class="btn btn-secondary">Cancelar</button>
+                    <button id="btnCreateStarModal" class="btn btn-primary">Lanzar Estrella</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shooting Star Details / Complete Modal -->
+        <div id="starDetailModal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <h2>Recordatorio de Estrella ⭐</h2>
+                <p id="starDetailMessage" class="star-task-text" style="font-size: 16px; margin: 10px 0; color: #ffeb3b; text-shadow: 0 0 8px rgba(255,235,59,0.3); font-weight: 500;"></p>
+                <div class="modal-actions">
+                    <button id="btnCompleteStar" class="btn btn-success">¡Tema Estudiado!</button>
+                    <button id="btnCloseStarModal" class="btn btn-secondary">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm Dialog Modal -->
+        <div id="confirmModal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel">
+                <h2 id="confirmTitle">¿Confirmar Acción?</h2>
+                <p id="confirmMessage">Esta acción no se puede deshacer.</p>
+                <div class="modal-actions">
+                    <button id="btnCancelConfirm" class="btn btn-secondary">Cancelar</button>
+                    <button id="btnAcceptConfirm" class="btn btn-danger">Aceptar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sync & Backup Modal -->
+        <div id="syncModal" class="modal-overlay hidden">
+            <div class="modal-content glass-panel sync-modal-content" style="position: relative; max-width: 450px; padding: 28px;">
+                <button id="btnCloseSyncModal" class="close-sidebar-btn" title="Cerrar modal" style="top: 16px; right: 16px;">×</button>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+                    <span style="font-size: 28px;">💾</span>
+                    <h2 style="font-family: 'Orbitron', sans-serif; font-size: 22px; font-weight: 700; margin: 0; color: var(--text-main);">Respaldos y Copias</h2>
+                </div>
+                <p style="font-size: 13px; color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">Respalda tus sistemas de estudio de forma local en tu dispositivo mediante archivos JSON o restaura un respaldo existente.</p>
+                
+                <div class="sync-section" style="display: flex; flex-direction: column; gap: 14px;">
+                    <button id="btnExportJSON" class="btn btn-primary btn-glow btn-full" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; font-weight: 600;">
+                        <span>📥</span> Exportar Sistema (JSON)
+                    </button>
+                    <label class="btn btn-secondary btn-full" style="margin: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; padding: 12px; font-weight: 600; border: 1px solid var(--glass-border);">
+                        <span>📤</span> Importar Sistema (JSON)
+                        <input type="file" id="importJSONFile" accept=".json" style="display: none;">
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Status Bar (Global Floating Indicator) -->
+    <div id="voiceStatusBar" class="voice-status-bar hidden">
+        <div class="voice-status-inner">
+            <div class="voice-pulse-rings">
+                <div class="voice-ring ring-1"></div>
+                <div class="voice-ring ring-2"></div>
+                <div class="voice-ring ring-3"></div>
+                <div class="voice-mic-dot">🎙️</div>
+            </div>
+            <div class="voice-status-text">
+                <span class="voice-status-title">Escuchando...</span>
+                <span class="voice-interim" id="voiceInterimText">Di algo para empezar</span>
+            </div>
+            <button class="voice-stop-btn" id="voiceStopBtn">Detener</button>
+        </div>
+    </div>
+
+    <!-- Centered Immersive Study Workspace -->
+    <div id="studyWorkspace" class="study-workspace hidden">
+        <div class="study-container glass-panel">
+            <!-- Study Header -->
+            <header class="study-header">
+                <div class="study-header-left">
+                    <div class="study-breadcrumbs" id="studyBreadcrumbs">
+                        <!-- Path from system name to selected node parent -->
+                    </div>
+                    <div class="study-title-wrapper">
+                        <span class="study-badge" id="studyNodeBadge">PLANETA</span>
+                        <h2 class="study-title" id="studyNodeTitle">Título del Nodo</h2>
+                    </div>
+                </div>
+                
+                <!-- Study Toolbar -->
+                <div class="study-toolbar">
+                    <!-- Pomodoro Timer -->
+                    <div class="study-timer-widget glass-panel">
+                        <span class="timer-icon">⏱️</span>
+                        <span id="studyTimerDisplay" class="timer-display">25:00</span>
+                        <button id="btnStartPauseTimer" class="timer-btn" title="Iniciar/Pausar Temporizador">▶</button>
+                        <button id="btnResetTimer" class="timer-btn" title="Reiniciar Temporizador">🔄</button>
+                    </div>
+
+                    <!-- Text-to-Speech -->
+                    <button id="btnSpeakText" class="btn btn-secondary toolbar-btn" title="Leer texto en voz alta">
+                        <span class="icon">🔊</span> <span class="lbl-btn">Leer</span>
+                    </button>
+
+                    <!-- Active Recall Toggle -->
+                    <button id="btnToggleRecall" class="btn btn-secondary toolbar-btn" title="Mostrar/Ocultar respuestas">
+                        <span class="icon">👁️</span> <span class="lbl-btn">Active Recall</span>
+                    </button>
+
+                    <!-- Font size controls -->
+                    <div class="font-controls">
+                        <button id="btnZoomTextOut" class="btn btn-secondary toolbar-btn" title="Reducir tamaño de letra">A-</button>
+                        <button id="btnZoomTextIn" class="btn btn-secondary toolbar-btn" title="Aumentar tamaño de letra">A+</button>
+                    </div>
+
+                    <!-- Close Workspace -->
+                    <button id="btnCloseStudy" class="btn btn-danger toolbar-btn close-study-btn" title="Volver al mapa orbital">
+                        <span class="icon">✕</span> <span class="lbl-btn">Salir</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Study Layout Area -->
+            <div class="study-layout">
+                <!-- Main Reading Column -->
+                <div class="study-document-container">
+                    <article id="studyContent" class="study-content">
+                        <!-- Rendered Markdown goes here -->
+                    </article>
+                </div>
+
+                <!-- Floating Quick Nav System Map -->
+                <div id="studyQuickNav" class="study-quick-nav">
+                    <!-- Loaded dynamically -->
+                </div>
+
+                <!-- Attached Resources Side Column -->
+                <aside class="study-attachments-sidebar" id="studyAttachmentsSidebar">
+                    <h3>Recursos Adjuntos</h3>
+                    <div class="study-attachments-list" id="studyAttachmentsList">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="three.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

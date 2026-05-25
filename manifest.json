@@ -1,0 +1,23 @@
+{
+  "name": "OrbiMind - Sistema Solar de Ideas",
+  "short_name": "OrbiMind",
+  "description": "Organiza tu estudio en un mapa de ideas orbitales interactivas.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#020208",
+  "theme_color": "#070714",
+  "orientation": "any",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
