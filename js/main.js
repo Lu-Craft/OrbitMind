@@ -1673,38 +1673,20 @@ document.addEventListener("DOMContentLoaded", async () => {
                 <div class="alien-helper-avatar">👽</div>
             `;
             
-            studyContent.appendChild(helper);
+            // Inyectamos el alíen DIRECTAMENTE dentro del span resaltado para anclarlo milimétricamente
+            highlightSpan.appendChild(helper);
 
-            // CALCULO MILIMÉTRICO DE COORDENADAS RELATIVAS
+            // Control de desbordamiento superior mediante getBoundingClientRect
             const spanRect = highlightSpan.getBoundingClientRect();
             const contentRect = studyContent.getBoundingClientRect();
+            const relativeTop = spanRect.top - contentRect.top;
 
-            // Posición left relativa respecto a studyContent
-            const left = spanRect.left - contentRect.left + studyContent.scrollLeft;
-            // Posición top relativa respecto a studyContent
-            const top = spanRect.top - contentRect.top + studyContent.scrollTop;
-
-            const width = spanRect.width;
-            const height = spanRect.height;
-            const contentWidth = studyContent.offsetWidth;
-
-            // Centrado horizontal
-            let helperLeft = left + width / 2;
-            helperLeft = Math.max(110, Math.min(contentWidth - 110, helperLeft));
-            helper.style.left = `${helperLeft}px`;
-
-            // Medir altura
-            const helperHeight = helper.offsetHeight;
-            let helperTop = top - helperHeight - 10;
-            
-            if (helperTop < 0) {
-                helperTop = top + height + 10;
+            // Si está muy cerca del borde superior (menos de 95px), lo posicionamos debajo
+            if (relativeTop < 95) {
                 helper.classList.add("position-below");
             } else {
                 helper.classList.remove("position-below");
             }
-            
-            helper.style.top = `${helperTop}px`;
 
             requestAnimationFrame(() => {
                 helper.classList.add("show");

@@ -3450,11 +3450,13 @@ body, html {
 
 /* Holographic floating alien helper in study text */
 .study-content {
-    position: relative; /* Ensure parent is relative for absolute positioning of helper */
+    position: relative;
 }
 
 .alien-text-helper {
     position: absolute;
+    left: 50%;
+    bottom: calc(100% + 10px); /* Flota exactamente encima del texto resaltado */
     display: flex;
     flex-direction: column; /* Vertical layout: bubble on top, avatar on bottom */
     align-items: center;
@@ -3462,10 +3464,11 @@ body, html {
     z-index: 1000;
     pointer-events: none;
     opacity: 0;
-    /* Use translateX(-50%) to center horizontally at the target 'left' coordinate */
+    /* Use translateX(-50%) to center horizontally at the parent span's center */
     transform: translateX(-50%) translateY(15px) scale(0.9);
     transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), 
                 transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap; /* Evita rotura de palabras en la burbuja */
 }
 
 .alien-text-helper.show {
@@ -3475,6 +3478,8 @@ body, html {
 }
 
 .alien-text-helper.position-below {
+    bottom: auto;
+    top: calc(100% + 10px); /* Flota exactamente debajo del texto resaltado */
     flex-direction: column-reverse; /* Avatar on top, bubble on bottom */
 }
 
@@ -3533,8 +3538,9 @@ body, html {
     border-top: 1.5px solid #00f2fe;
 }
 
-/* Glowing text highlight */
+/* Glowing text highlight acts as relative parent container */
 .alien-search-highlight {
+    position: relative; /* Esencial para anclar el alíen */
     background: rgba(0, 255, 135, 0.18);
     border-bottom: 2px solid #00ff87;
     color: #00ff87;
@@ -3544,7 +3550,7 @@ body, html {
     box-shadow: 0 0 8px rgba(0, 255, 135, 0.25);
     animation: neonHighlightPulse 1.5s infinite alternate;
     transition: all 0.4s ease;
-    display: inline;
+    display: inline-block; /* Asegura un contenedor sólido en línea */
 }
 
 /* Resaltado amarillo neón para sugerencias difusas */
