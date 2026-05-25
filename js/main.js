@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=40';
+import { initTutorial } from './tutorial.js?v=41';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=40';
+import { defaultSystemsData } from './defaultSystems.js?v=41';
 
 document.addEventListener("DOMContentLoaded", async () => {
     const db = new OrbiMindDB();
@@ -1345,7 +1345,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         studyContent.style.setProperty('--study-font-size', '16px');
     }
 
-    function navigateToNode(targetNode) {
+    function navigateToNode(targetNode, searchQuery = null) {
         if (!targetNode) return;
 
         // Perform complete orbit/focus navigation first
@@ -1376,10 +1376,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         engine.followedNode = targetNode;
         openSidebar(targetNode);
         updateAddButtons();
-        openStudyWorkspace(targetNode, true);
+        openStudyWorkspace(targetNode, true, searchQuery);
     }
 
-    function openStudyWorkspace(node, keepTimer = false) {
+    function openStudyWorkspace(node, keepTimer = false, searchQuery = null) {
         if (!node) return;
 
         if (!keepTimer) {
@@ -1480,6 +1480,167 @@ document.addEventListener("DOMContentLoaded", async () => {
         updateStudyQuickNav(node);
 
         studyWorkspace.classList.remove("hidden");
+
+        // Remove any previous highlights/helpers
+        removeAlienHighlights();
+
+        if (searchQuery) {
+            // Wait a brief moment for the browser to lay out the visible workspace
+            setTimeout(() => {
+                const highlightSpan = highlightSearchQueryInStudy(searchQuery);
+                if (highlightSpan) {
+                    const container = document.querySelector(".study-document-container");
+                    if (container) {
+                        highlightSpan.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }
+                    createAlienTextHelper(highlightSpan);
+                }
+            }, 150);
+        }
+    }
+
+    function removeAlienHighlights() {
+        const highlights = studyContent.querySelectorAll(".alien-search-highlight");
+        highlights.forEach(span => {
+            const parent = span.parentNode;
+            if (parent) {
+                const textNode = document.createTextNode(span.textContent);
+                parent.replaceChild(textNode, span);
+            }
+        });
+        studyContent.normalize(); // merge text nodes
+        
+        const helper = studyContent.querySelector(".alien-text-helper");
+        if (helper) {
+            helper.remove();
+        }
+    }
+
+    function highlightSearchQueryInStudy(query) {
+        if (!query) return null;
+        
+        // Strategy 1: Search exact query case-insensitively
+        let found = highlightTerm(query);
+        if (found) return studyContent.querySelector(".alien-search-highlight");
+        
+        // Strategy 2: Search individual words (longer than 2 chars)
+        const words = query.split(/\s+/).filter(w => w.length > 2);
+        for (const word of words) {
+            found = highlightTerm(word);
+            if (found) return studyContent.querySelector(".alien-search-highlight");
+        }
+        
+        return null;
+
+        function highlightTerm(term) {
+            const normalizedQuery = term.toLowerCase();
+            let matchesFound = false;
+
+            function traverse(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const textContent = node.textContent;
+                    const index = textContent.toLowerCase().indexOf(normalizedQuery);
+                    if (index !== -1) {
+                        const parent = node.parentNode;
+                        if (!parent) return;
+                        const tag = parent.tagName.toUpperCase();
+                        if (tag === "SCRIPT" || tag === "STYLE" || parent.closest('.katex') || parent.closest('.katex-display')) {
+                            return;
+                        }
+                        
+                        const beforeText = textContent.substring(0, index);
+                        const matchText = textContent.substring(index, index + term.length);
+                        const afterText = textContent.substring(index + term.length);
+                        
+                        const fragment = document.createDocumentFragment();
+                        if (beforeText) {
+                            fragment.appendChild(document.createTextNode(beforeText));
+                        }
+                        
+                        const highlightSpan = document.createElement("span");
+                        highlightSpan.className = "alien-search-highlight";
+                        highlightSpan.textContent = matchText;
+                        fragment.appendChild(highlightSpan);
+                        
+                        if (afterText) {
+                            const afterNode = document.createTextNode(afterText);
+                            fragment.appendChild(afterNode);
+                            traverse(afterNode);
+                        }
+                        
+                        parent.replaceChild(fragment, node);
+                        matchesFound = true;
+                    }
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    const children = Array.from(node.childNodes);
+                    for (let i = 0; i < children.length; i++) {
+                        traverse(children[i]);
+                    }
+                }
+            }
+
+            traverse(studyContent);
+            return matchesFound;
+        }
+    }
+
+    function createAlienTextHelper(highlightSpan) {
+        const existingHelper = studyContent.querySelector(".alien-text-helper");
+        if (existingHelper) existingHelper.remove();
+
+        const helper = document.createElement("div");
+        helper.className = "alien-text-helper";
+        
+        const phrases = [
+            "¡Aquí está, humano!",
+            "¡Encontré la señal!",
+            "¡Apuntes localizados!",
+            "¡Telemetría exacta!",
+            "¡Rastreo exitoso!"
+        ];
+        const phrase = phrases[Math.floor(Math.random() * phrases.length)];
+
+        helper.innerHTML = `
+            <div class="alien-helper-avatar">👽</div>
+            <div class="alien-helper-bubble">${phrase}</div>
+        `;
+        
+        studyContent.appendChild(helper);
+
+        // Position the helper relative to studyContent
+        const spanRect = highlightSpan.getBoundingClientRect();
+        const contentRect = studyContent.getBoundingClientRect();
+
+        const top = spanRect.top - contentRect.top;
+        const left = spanRect.left - contentRect.left;
+
+        let helperLeft = left + spanRect.width + 15;
+        const bubble = helper.querySelector('.alien-helper-bubble');
+        
+        if (helperLeft + 200 > contentRect.width) {
+            helperLeft = Math.max(10, left - 240);
+            bubble.classList.add('left-bubble');
+        } else {
+            bubble.classList.remove('left-bubble');
+        }
+
+        helper.style.top = `${top - 15}px`;
+        helper.style.left = `${helperLeft}px`;
+
+        requestAnimationFrame(() => {
+            helper.classList.add("show");
+        });
+
+        setTimeout(() => {
+            helper.classList.remove("show");
+            
+            const highlights = studyContent.querySelectorAll(".alien-search-highlight");
+            highlights.forEach(span => span.classList.add("fade-out"));
+
+            setTimeout(() => {
+                removeAlienHighlights();
+            }, 500);
+        }, 5000);
     }
 
     function updateStudyQuickNav(currentNode) {
@@ -2234,7 +2395,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 `;
 
                 item.addEventListener("click", () => {
-                    navigateToNode(node);
+                    navigateToNode(node, query);
                     engine.selectedNode = node;
                     engine.followedNode = node;
                     
