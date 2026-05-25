@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=44';
+import { initTutorial } from './tutorial.js?v=45';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=44';
+import { defaultSystemsData } from './defaultSystems.js?v=45';
 
 document.addEventListener("DOMContentLoaded", async () => {
     // PWA Cache Buster: force hard reload if script query version changes
@@ -1540,6 +1540,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function removeAlienHighlights() {
+        const helper = studyContent.querySelector(".alien-text-helper");
+        if (helper) {
+            helper.remove();
+        }
+
         const highlights = studyContent.querySelectorAll(".alien-search-highlight");
         highlights.forEach(span => {
             const parent = span.parentNode;
@@ -1549,11 +1554,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         });
         studyContent.normalize(); // merge text nodes
-        
-        const helper = studyContent.querySelector(".alien-text-helper");
-        if (helper) {
-            helper.remove();
-        }
     }
 
     function highlightSearchQueryInStudy(query, isFuzzy = false) {
