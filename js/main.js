@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=41';
+import { initTutorial } from './tutorial.js?v=42';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=41';
+import { defaultSystemsData } from './defaultSystems.js?v=42';
 
 document.addEventListener("DOMContentLoaded", async () => {
     const db = new OrbiMindDB();
@@ -1600,9 +1600,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         ];
         const phrase = phrases[Math.floor(Math.random() * phrases.length)];
 
+        // Order: bubble on top, avatar on bottom
         helper.innerHTML = `
-            <div class="alien-helper-avatar">👽</div>
             <div class="alien-helper-bubble">${phrase}</div>
+            <div class="alien-helper-avatar">👽</div>
         `;
         
         studyContent.appendChild(helper);
@@ -1614,18 +1615,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         const top = spanRect.top - contentRect.top;
         const left = spanRect.left - contentRect.left;
 
-        let helperLeft = left + spanRect.width + 15;
-        const bubble = helper.querySelector('.alien-helper-bubble');
-        
-        if (helperLeft + 200 > contentRect.width) {
-            helperLeft = Math.max(10, left - 240);
-            bubble.classList.add('left-bubble');
-        } else {
-            bubble.classList.remove('left-bubble');
-        }
-
-        helper.style.top = `${top - 15}px`;
+        // Horizontally center relative to the highlighted span
+        let helperLeft = left + spanRect.width / 2;
+        // Clamp to prevent horizontal overflow outside the container
+        helperLeft = Math.max(110, Math.min(contentRect.width - 110, helperLeft));
         helper.style.left = `${helperLeft}px`;
+
+        // Measure height after appending to position vertically above the span
+        const helperHeight = helper.offsetHeight;
+        let helperTop = top - helperHeight - 10;
+        
+        // If it overflows the top of the container, position it below instead
+        if (helperTop < 0) {
+            helperTop = top + spanRect.height + 10;
+            helper.classList.add("position-below");
+        } else {
+            helper.classList.remove("position-below");
+        }
+        
+        helper.style.top = `${helperTop}px`;
 
         requestAnimationFrame(() => {
             helper.classList.add("show");
