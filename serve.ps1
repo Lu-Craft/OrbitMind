@@ -2,7 +2,7 @@
 # Servidor web local ligero para ejecutar OrbiMind con soporte PWA completo.
 # Ejecuta este archivo en PowerShell.
 
-$port = 8001
+$port = 8002
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$port/")
 
@@ -50,6 +50,9 @@ try {
                 Write-Host "Sirviendo: $path ($($bytes.Length) bytes, $contentType)" -ForegroundColor Cyan
                 $response.ContentType = $contentType
                 $response.ContentLength64 = $bytes.Length
+                $response.Headers.Add("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+                $response.Headers.Add("Pragma", "no-cache")
+                $response.Headers.Add("Expires", "0")
                 $response.OutputStream.Write($bytes, 0, $bytes.Length)
             } else {
                 Write-Host "No encontrado: $path" -ForegroundColor Red

@@ -2394,9 +2394,14 @@ body, html {
     align-items: center;
 }
 
-.alien-search-panel.open .alien-avatar-container {
+.alien-search-panel.open .alien-avatar-container,
+.tutorial-card .alien-avatar-container {
     animation: ufoArrival 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards,
                alienBobbing 3.5s ease-in-out infinite 1.2s;
+}
+
+.tutorial-card .alien-avatar-container {
+    height: 70px;
 }
 
 /* Glowing Rotating Holographic Outer Rings */
@@ -2943,18 +2948,9 @@ body, html {
 }
 
 @keyframes holoFlicker {
-    0% { opacity: 1; filter: drop-shadow(0 0 6px rgba(0, 255, 135, 0.6)); }
-    1% { opacity: 0.78; }
-    2% { opacity: 0.95; }
-    45% { opacity: 1; filter: drop-shadow(0 0 6px rgba(0, 255, 135, 0.6)); }
-    46% { opacity: 0.3; }
-    47% { opacity: 0.88; }
-    48% { opacity: 0.96; }
-    49% { opacity: 0.25; }
-    50% { opacity: 0.95; }
-    51% { opacity: 1; filter: drop-shadow(0 0 8px rgba(0, 255, 135, 0.8)); }
-    98% { opacity: 1; }
-    99% { opacity: 0.85; }
+    0% { filter: drop-shadow(0 0 6px rgba(0, 255, 135, 0.6)); }
+    50% { filter: drop-shadow(0 0 12px rgba(0, 255, 135, 0.9)); }
+    100% { filter: drop-shadow(0 0 6px rgba(0, 255, 135, 0.6)); }
 }
 
 @keyframes tractorBeamPulse {
@@ -3132,6 +3128,17 @@ body, html {
                 0 0 25px 6px rgba(0, 242, 254, 0.6);
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     opacity: 0;
+}
+
+.tutorial-highlight-helper.center-mode {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: rgba(6, 8, 20, 0.78) !important;
+    transition: none !important;
 }
 
 .tutorial-card {

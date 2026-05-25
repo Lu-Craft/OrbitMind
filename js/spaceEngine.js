@@ -111,10 +111,12 @@ export class SpaceEngine {
             return nodeRadius + 35; // Just the node itself + some padding
         }
         
+        const expansion = (node.type !== "sun" && node.orbitExpansion !== undefined) ? node.orbitExpansion : 1.0;
+        
         let maxRadius = 0;
         children.forEach(child => {
             const childScale = this.getNodeScale(child);
-            const orbitRadius = this.getNodeBaseOrbitRadius(child) * Math.max(0.55, childScale);
+            const orbitRadius = this.getNodeBaseOrbitRadius(child) * Math.max(0.55, childScale) * expansion;
             const childRadius = this.getNodeRadius(child);
             const totalDist = orbitRadius + childRadius;
             if (totalDist > maxRadius) {
@@ -324,8 +326,8 @@ export class SpaceEngine {
         if (node.type === "sun") baseR = 55;
         else if (node.type === "planet") baseR = 27;
         else if (node.type === "planetoid") baseR = 19;
-        else if (node.type === "moon") baseR = 13;
-        else if (node.type === "satellite") baseR = 18;
+        else if (node.type === "moon") baseR = 15;
+        else if (node.type === "satellite") baseR = 21;
         
         const scale = node.currentScale !== undefined ? node.currentScale : 1.0;
         return baseR * scale;
@@ -346,8 +348,8 @@ export class SpaceEngine {
         const depth = this.getDepth(node, this.currentParentId);
         if (depth <= 1) return 1.0;
         if (depth === 2) return 0.55;
-        if (depth === 3) return 0.40;
-        return 0.28;
+        if (depth === 3) return 0.45;
+        return 0.33;
     }
 
     // Calcula de forma determinista vértices de asteroides usando su ID
@@ -404,7 +406,12 @@ export class SpaceEngine {
         }
 
         const scale = node.currentScale !== undefined ? node.currentScale : 1.0;
-        const orbitRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
+        let orbitRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
+        
+        const parentNode = this.nodes.find(n => n.id === node.parentId);
+        if (parentNode && parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined) {
+            orbitRadius *= parentNode.orbitExpansion;
+        }
         
         const siblings = this.nodes.filter(n => n.parentId === node.parentId).sort((a, b) => a.id.localeCompare(b.id));
         const index = siblings.indexOf(node);
@@ -418,7 +425,6 @@ export class SpaceEngine {
             };
         }
 
-        const parentNode = this.nodes.find(n => n.id === node.parentId);
         if (parentNode) {
             const parentPos = this.getNodeAbsolutePosition(parentNode);
             return {
@@ -534,6 +540,18 @@ export class SpaceEngine {
                 n.currentScale = targetScale;
             } else {
                 n.currentScale += (targetScale - n.currentScale) * 8 * delta;
+            }
+
+            // Update orbit expansion smoothly (expand if selected, hovered, or is ancestor of selected/hovered)
+            const isSelected = this.selectedNode && this.selectedNode.id === n.id;
+            const isHovered = this.hoveredNode && this.hoveredNode.id === n.id;
+            const isAncestorOfSelected = this.selectedNode && this.isDescendantOf(this.selectedNode, n.id);
+            const isAncestorOfHovered = this.hoveredNode && this.isDescendantOf(this.hoveredNode, n.id);
+            const targetExpansion = (isSelected || isHovered || isAncestorOfSelected || isAncestorOfHovered) ? 1.75 : 1.0;
+            if (n.orbitExpansion === undefined) {
+                n.orbitExpansion = targetExpansion;
+            } else {
+                n.orbitExpansion += (targetExpansion - n.orbitExpansion) * 8 * delta;
             }
         });
 
@@ -784,7 +802,10 @@ export class SpaceEngine {
                     const parentPos = this.getNodeAbsolutePosition(parentNode);
                     const depth = this.getDepth(node, this.currentParentId);
                     const scale = node.currentScale !== undefined ? node.currentScale : 1.0;
-                    const orbitRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
+                    let orbitRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
+                    if (parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined) {
+                        orbitRadius *= parentNode.orbitExpansion;
+                    }
                     
                     let opacity = 0.18;
                     let lineWidth = 0.5;
@@ -973,24 +994,67 @@ export class SpaceEngine {
 
             // Dibujar Textos / Etiquetas
             const scale = node.currentScale !== undefined ? node.currentScale : 1.0;
-            if (scale >= 0.8 || (this.selectedNode && this.selectedNode.id === node.id) || (this.hoveredNode && this.hoveredNode.id === node.id)) {
+            const screenRadius = r * this.zoom;
+            
+            let showLabel = false;
+            const isCurrentParent = node.id === this.currentParentId;
+            
+            // Check direct child/parent relations
+            const isChildOfSelected = this.selectedNode && node.parentId === this.selectedNode.id;
+            const isParentOfSelected = this.selectedNode && node.id === this.selectedNode.parentId;
+            const isChildOfHovered = this.hoveredNode && node.parentId === this.hoveredNode.id;
+            
+            const isDefaultVisible = !this.selectedNode && node.parentId === this.currentParentId;
+            
+            if (isCurrentParent || isSelected || isHovered || isSearchMatch) {
+                showLabel = true;
+            } else if (isChildOfSelected || isParentOfSelected || isChildOfHovered || isDefaultVisible) {
+                // Apply a basic screen size check to avoid cluttering at extreme zoom-out
+                showLabel = screenRadius >= 6;
+            }
+            
+            if (showLabel) {
                 this.ctx.save();
                 
-                this.ctx.font = node.type === "sun" 
-                    ? "bold 13px 'Orbitron', sans-serif" 
-                    : "bold 11px 'Outfit', sans-serif";
+                // Define style based on hierarchy
+                let fontStyle = "bold 11px 'Outfit', sans-serif";
+                let textFill = "#ffffff";
+                let outlineWidth = 3;
                 
+                if (node.type === "sun") {
+                    fontStyle = "bold 13px 'Orbitron', sans-serif";
+                    textFill = "#ffd600";
+                    outlineWidth = 3;
+                } else if (node.type === "planet") {
+                    fontStyle = "bold 11.5px 'Outfit', sans-serif";
+                    textFill = "#ffffff";
+                    outlineWidth = 3;
+                } else if (node.type === "planetoid") {
+                    fontStyle = "bold 10px 'Outfit', sans-serif";
+                    textFill = "#e2e8f0";
+                    outlineWidth = 2.5;
+                } else if (node.type === "moon") {
+                    fontStyle = "500 9px 'Outfit', sans-serif";
+                    textFill = "#a0a5b0";
+                    outlineWidth = 2;
+                } else if (node.type === "satellite") {
+                    fontStyle = "400 8px 'Outfit', sans-serif";
+                    textFill = "#787d8a";
+                    outlineWidth = 1.8;
+                }
+                
+                this.ctx.font = fontStyle;
                 this.ctx.textAlign = "center";
                 this.ctx.textBaseline = "top";
                 
                 // Dibujar Borde Negro del texto para legibilidad
                 this.ctx.strokeStyle = "rgba(2, 5, 20, 0.85)";
-                this.ctx.lineWidth = 3;
+                this.ctx.lineWidth = outlineWidth;
                 this.ctx.lineJoin = "round";
                 this.ctx.strokeText(node.title, pos.x, pos.y + r + 8);
                 
                 // Rellenar Texto
-                this.ctx.fillStyle = node.type === "sun" ? "#ffd600" : "#ffffff";
+                this.ctx.fillStyle = textFill;
                 this.ctx.fillText(node.title, pos.x, pos.y + r + 8);
                 
                 this.ctx.restore();

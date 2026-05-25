@@ -57,7 +57,7 @@ export function initTutorial(nodesList, currentParentId, engine) {
                 position: "right"
             },
             {
-                title: "Buscador Inteligente Alíen 👽",
+                title: "Buscador Inteligente Alíen",
                 description: "¡Tu asistente extraterrestre! Haz clic en el <strong>Alíen</strong> para abrir el panel de búsqueda inteligente. Puedes escribir o dictar por voz (🎙️) lo que buscas. ¡La nave del alíen volará al planeta que tenga la respuesta!",
                 target: "#btnOpenSearch",
                 position: "right"
@@ -90,6 +90,38 @@ export function initTutorial(nodesList, currentParentId, engine) {
                              "</ul>",
                 target: "#spaceCanvas",
                 position: "center"
+            },
+            {
+                title: "Mensaje de tu Asistente Alíen",
+                description: '<div class="tutorial-alien-wrapper" style="display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">' +
+                             '  <div class="alien-avatar-container" style="margin: 0; opacity: 1;">' +
+                             '      <div class="alien-holo-ring"></div>' +
+                             '      <div class="alien-spaceship-glass">' +
+                             '          <span class="alien-emoji">👽</span>' +
+                             '      </div>' +
+                             '      <div class="alien-spaceship-hull">' +
+                             '          <div class="alien-lights">' +
+                             '              <span class="light-dot"></span>' +
+                             '              <span class="light-dot"></span>' +
+                             '              <span class="light-dot"></span>' +
+                             '              <span class="light-dot"></span>' +
+                             '          </div>' +
+                             '      </div>' +
+                             '      <div class="alien-tractor-beam"></div>' +
+                             '  </div>' +
+                             '  <div style="flex: 1; font-size: 13px; line-height: 1.5;">' +
+                             '      ¡Humano, un último mensaje estelar! Para ayudarte a comenzar, he poblado tu espacio con <strong>5 sistemas solares de prueba</strong> con temáticas variadas (científica, social, artística, histórica y tecnológica).' +
+                             '  </div>' +
+                             '</div>' +
+                             '<ul style="margin-bottom: 15px;">' +
+                             '<li><strong>Explora:</strong> Navega por los temas preestablecidos para ver cómo estructurar tus ideas.</li>' +
+                             '<li><strong>Personaliza:</strong> Eres libre de eliminar los sistemas que no te interesen y crear todos los nuevos que desees.</li>' +
+                             '</ul>' +
+                             '<p style="font-size: 13px; line-height: 1.5; color: #81c784;">' +
+                             '  💡 <strong>Tip Pro:</strong> ¡Puedes interactuar conmigo haciendo clic en mi icono 👽 del panel flotante izquierdo para buscar cualquier palabra o apunte en tus órbitas!' +
+                             '</p>',
+                target: null,
+                position: "center"
             }
         ];
 
@@ -112,7 +144,7 @@ export function initTutorial(nodesList, currentParentId, engine) {
 
             // Render Card Content
             card.innerHTML = `
-                <h3>🪐 ${step.title}</h3>
+                <h3>${step.title}</h3>
                 <div>${step.description}</div>
                 <div class="tutorial-footer">
                     <span class="tutorial-steps-indicator">Paso ${index + 1} de ${tutorialSteps.length}</span>
@@ -194,11 +226,18 @@ export function initTutorial(nodesList, currentParentId, engine) {
                 const rect = getCombinedRect(targets);
                 
                 if (rect) {
+                    // Remove center-mode styles if switching back to target spotlight
+                    helper.classList.remove("center-mode");
+                    helper.style.background = "";
+
                     // Update Spotlight Box Position and size
                     helper.style.top = (rect.top - 4) + "px";
                     helper.style.left = (rect.left - 4) + "px";
                     helper.style.width = (rect.width + 8) + "px";
                     helper.style.height = (rect.height + 8) + "px";
+                    helper.style.boxShadow = "0 0 0 9999px rgba(6, 8, 20, 0.78), " +
+                                             "0 0 0 2px rgba(0, 242, 254, 0.95), " +
+                                             "0 0 25px 6px rgba(0, 242, 254, 0.6)";
                     
                     let borderRadius = "8px";
                     if (targets.length === 1) {
@@ -221,11 +260,7 @@ export function initTutorial(nodesList, currentParentId, engine) {
             }
             
             // Center mode or fallback if target is hidden/not found
-            helper.style.top = "50%";
-            helper.style.left = "50%";
-            helper.style.width = "0px";
-            helper.style.height = "0px";
-            helper.style.borderRadius = "50%";
+            helper.classList.add("center-mode");
             helper.style.opacity = "1";
 
             positionCard(null, "center");

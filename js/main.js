@@ -4,11 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js';
+import { initTutorial } from './tutorial.js?v=40';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
+import { defaultSystemsData } from './defaultSystems.js?v=40';
 
 document.addEventListener("DOMContentLoaded", async () => {
     const db = new OrbiMindDB();
@@ -288,351 +289,77 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // --- CARGAR DATOS ---
     async function loadSystemsList() {
-        // Upgrade seed version to ensure the user gets the highly advanced thermodynamics system
-        const SEED_VERSION = "3";
+        // Upgrade seed version to ensure the user gets all 5 custom default systems
+        const SEED_VERSION = "14";
         const currentSeedVer = localStorage.getItem("orbimind_seed_ver");
         let systems = await db.getAllSystems();
         
-        const advancedSys = systems.find(sys => sys.name === "Termodinámica Avanzada");
-        if (currentSeedVer !== SEED_VERSION && advancedSys) {
-            await db.deleteSystem(advancedSys.id);
+        const defaultNames = [
+            "Termodinámica Avanzada",
+            "Psicología Social y Relaciones Humanas",
+            "Historia del Arte Contemporáneo",
+            "El Imperio Romano",
+            "Inteligencia Artificial"
+        ];
+
+        if (currentSeedVer !== SEED_VERSION) {
+            // Delete only pre-existing default systems to avoid wiping user-created systems
+            for (const sys of systems) {
+                if (defaultNames.includes(sys.name)) {
+                    await db.deleteSystem(sys.id);
+                }
+            }
             systems = await db.getAllSystems();
         }
         localStorage.setItem("orbimind_seed_ver", SEED_VERSION);
 
         selectSystem.innerHTML = "";
         
-        const hasAdvanced = systems.some(sys => sys.name === "Termodinámica Avanzada");
-        if (!hasAdvanced) {
-            const defaultId = crypto.randomUUID();
-            const defaultSystem = { id: defaultId, name: "Termodinámica Avanzada", createdAt: new Date() };
-            await db.saveSystem(defaultSystem);
-            
-            // 1. Sol Central
-            const sunId = crypto.randomUUID();
-            await db.saveNode({
-                id: sunId,
-                systemId: defaultId,
-                parentId: null,
-                title: "Termodinámica",
-                type: "sun",
-                notes: `# Termodinámica Física y Química (Nivel Universitario)\nLa termodinámica clásica y estadística describe el comportamiento macroscópico y microscópico de la materia bajo equilibrio térmico mediante leyes matemáticas y estadísticas rigurosas.\n\n> [!IMPORTANT]\n> Este mapa orbital representa la jerarquía de 5 niveles de estudio en la termodinámica. Usa la rueda del ratón para hacer zoom y arrastra para desplazarte. Haz **doble clic** en cualquier planeta para entrar en su órbita y ver subtemas.\n\n### Concepto de Diferencial Exacta:\nEn termodinámica, las funciones de estado poseen diferenciales exactas, lo que significa que el cambio de una variable de estado depende únicamente del estado inicial y final, no de la trayectoria. Para una función $z(x, y)$:\n$$dz = \\left(\\frac{\\partial z}{\\partial x}\\right)_y dx + \\left(\\frac{\\partial z}{\\partial y}\\right)_x dy$$\nSi $dz$ es exacta, se cumple el teorema de Euler para las segundas derivadas cruzadas:\n$$\\frac{\\partial^2 z}{\\partial y \\partial x} = \\frac{\\partial^2 z}{\\partial x \\partial y}$$\n\n### Clasificación de Sistemas:\n1. **Aislado**: No intercambia materia ni energía con el entorno ($\\Delta U = 0, \\Delta N = 0$).\n2. **Cerrado**: Intercambia energía pero no materia ($\\Delta N = 0$).\n3. **Abierto**: Intercambia tanto materia como energía.\n\n### Variables de Estado:\n- **Intensivas**: Independientes del tamaño del sistema (ej. Temperatura $T$, Presión $P$, Densidad $\\rho$).\n- **Extensivas**: Proporcionales al tamaño del sistema (ej. Volumen $V$, Energía interna $U$, Entropía $S$, Masa $m$).\n\nQ: ¿Qué diferencia a una función de estado de una función de trayectoria?\nA: Una **función de estado** (como $U, H, S, G$) tiene una diferencial exacta y su cambio depende solo de los estados extremos. Una **función de trayectoria** (como el calor $Q$ y el trabajo $W$) tiene una diferencial inexacta ($\\delta Q, \\delta W$) y su valor acumulado depende de los detalles mecánicos y térmicos de la transición.\n\n[^1]: Zemansky, M. W. & Dittman, R. H. (1997). Heat and Thermodynamics. McGraw-Hill.\n[^2]: Callen, H. B. (1985). Thermodynamics and an Introduction to Thermostatistics. Wiley.`,
-                attachments: [],
-                orbitRadius: 0,
-                orbitSpeed: 0,
-                color: "#ffaa00",
-                angle: 0
-            });
-
-            // 2. Planeta: Leyes Fundamentales
-            const p1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: p1Id,
-                systemId: defaultId,
-                parentId: sunId,
-                title: "Leyes Fundamentales",
-                type: "planet",
-                notes: `# Leyes Fundamentales de la Termodinámica\nLos cuatro principios pilares sobre los que se construye la termodinámica macroscópica clásica.\n\n### Ley Cero (Equilibrio Térmico):\nSi un sistema $A$ está en equilibrio térmico con un sistema $B$, y $B$ está en equilibrio con $C$, entonces $A$ y $C$ están en equilibrio térmico entre sí:\n$$T_A = T_B \\quad \\text{y} \\quad T_B = T_C \\implies T_A = T_C$$\nPermite definir operacionalmente el concepto de temperatura y calibrar termómetros.\n\n### Primera Ley (Conservación de la Energía):\nLa energía interna total de un sistema cerrado solo se modifica por el intercambio de calor o la realización de trabajo:\n$$dU = \\delta Q - \\delta W$$\n- $dU$: Diferencial exacta de la energía interna (J).\n- $\\delta Q$: Cantidad diferencial inexacta de calor absorbido por el sistema (J).\n- $\\delta W$: Cantidad diferencial inexacta de trabajo realizado por el sistema (J).\n\n### Segunda Ley (Entropía y Causalidad):\nLa entropía de un sistema aislado en un proceso espontáneo siempre aumenta, alcanzando su máximo en el equilibrio:\n$$dS_{\\text{universo}} = dS_{\\text{sistema}} + dS_{\\text{entorno}} \\ge 0$$\nPara un ciclo termodinámico cerrado con transferencia de calor:\n$$\\oint \\frac{\\delta Q}{T} \\le 0 \\quad \\text{(Desigualdad de Clausius)}$$\n\n### Tercera Ley (Límite del Cero Absoluto):\nAl aproximarse la temperatura de un sistema cristalino perfecto al cero absoluto, su entropía toma un valor constante mínimo (que por convención se define como cero):\n$$\\lim_{T \\to 0} S = 0$$\n- **Nernst-Simon**: El cambio de entropía asociado con cualquier proceso químico o físico reversible tiende a cero cuando la temperatura absoluta se aproxima a cero.\n\nQ: ¿Por qué la segunda ley prohíbe una eficiencia del 100% en motores térmicos?\nA: Porque la conversión de calor en trabajo de forma cíclica requiere liberar parte del calor a un foco frío para que la entropía neta del universo no disminuya, limitando la eficiencia según el teorema de Carnot.`,
-                attachments: [],
-                orbitRadius: 135,
-                orbitSpeed: 0.05,
-                color: "#00f2fe",
-                angle: 0.5
-            });
-
-            // 3. Planetoide: Primera Ley (bajo Planeta 1)
-            const pl1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: pl1_1Id,
-                systemId: defaultId,
-                parentId: p1Id,
-                title: "Primera Ley",
-                type: "planetoid",
-                notes: `# Primera Ley de la Termodinámica\nFormulación matemática rigurosa para el balance energético de sistemas cerrados y abiertos.\n\n### Ecuación Fundamental (Forma Diferencial):\nPara un sistema termodinámico simple cerrado en un proceso reversible:\n$$dU = T\\,dS - P\\,dV$$\nPara un sistema abierto multiespecie (donde se transfiere materia), agregamos el potencial químico:\n$$dU = T\\,dS - P\\,dV + \\sum_{i} \\mu_i \\, dN_i$$\nDonde las variables y unidades en el SI son:\n- $U$: Energía interna total (J, función de estado).\n- $T$: Temperatura absoluta del sistema (K).\n- $S$: Entropía del sistema (J/K).\n- $P$: Presión interna en el límite de equilibrio (Pa).\n- $V$: Volumen ocupado por el sistema ($\\text{m}^3$).\n- $\\mu_i$: Potencial químico de la especie $i$ (J/mol). Define la afinidad química y el gradiente molar.\n- $N_i$: Cantidad de sustancia de la especie $i$ (moles).\n\n### Conservación de la Entalpía en Procesos a Presión Constante:\nDefiniendo la Entalpía como $H = U + PV$, en procesos isobáricos irreversibles y reversibles donde solo hay trabajo de expansión $P-V$, el cambio de entalpía coincide con el calor intercambiado:\n$$dH = \\delta Q_P \\implies \\Delta H = Q_P$$\n\nQ: ¿Cómo se expresa la primera ley para un ciclo termodinámico?\nA: Como $U$ es una función de estado, el cambio neto de energía interna a lo largo de un ciclo cerrado es idénticamente cero ($\\oint dU = 0$). Por lo tanto, el calor neto transferido es numéricamente igual al trabajo neto realizado: $Q_{\\text{neto}} = W_{\\text{neto}}$.`,
-                attachments: [],
-                orbitRadius: 60,
-                orbitSpeed: -0.1,
-                color: "#ff7b00",
-                angle: 1.0
-            });
-
-            // 4. Luna: Trabajo de Expansión (bajo Planetoide 1.1)
-            const m1_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: m1_1_1Id,
-                systemId: defaultId,
-                parentId: pl1_1Id,
-                title: "Trabajo de Expansión",
-                type: "moon",
-                notes: `# Trabajo de Expansión ($P-V$)\nEl trabajo mecánico macroscópico debido a los cambios de volumen de un fluido contra una presión externa opositora.\n\n### Formulación Fundamental:\nEl trabajo diferencial realizado por el sistema al expandirse una cantidad $dV$ contra una presión externa $P_{\\text{ext}}$ es:\n$$\\delta W = P_{\\text{ext}} \\, dV$$\nPara un proceso reversible, la presión interna del sistema difiere infinitesimalmente de la presión externa ($P \\approx P_{\\text{ext}}$), lo que permite integrar usando la ecuación de estado:\n$$W = \\int_{V_i}^{V_f} P(V, T) \\, dV$$\nDonde:\n- $W$: Trabajo total acumulado realizado por el sistema (J).\n- $P$: Presión interna del gas (Pa).\n- $V$: Volumen del sistema ($\\text{m}^3$).\n- $V_i, V_f$: Volúmenes inicial y final respectivamente.\n\n### Trabajo para un Gas Ideal en Procesos Reversibles:\n1. **Isobárico** ($P = \\text{cte}$):\n   $$W = P(V_f - V_i)$$\n2. **Isotérmico** ($T = \\text{cte}$, $P = \\frac{nRT}{V}$):\n   $$W = nRT \\ln\\left(\\frac{V_f}{V_i}\right)$$\n   *(donde $n$ es el número de moles y $R = 8.314 \\text{ J/(mol K)}$)*\n3. **Adiabático** ($\\delta Q = 0$, $PV^\\gamma = \\text{cte}$):\n   $$W = \\frac{P_i V_i - P_f V_f}{\\gamma - 1}$$\n   *(donde $\\gamma = C_p / C_v$ es el coeficiente adiabático)*\n4. **Isocórico** ($V = \\text{cte}$):\n   $$W = 0$$\n\n### Comparación de Trabajo en Diferentes Procesos:\n[grafico tipo="bar" valores="83,57,34,0" etiquetas="Isotérmico,Isobárico,Adiabático,Isocórico" titulo="Trabajo de Expansión (J) de 1 mol de gas ideal"]`,
-                attachments: [],
-                orbitRadius: 35,
-                orbitSpeed: 0.25,
-                color: "#00ff87",
-                angle: 1.5
-            });
-
-            // 5. Satélite: Relación de Mayer (bajo Luna 1.1.1)
-            const s1_1_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: s1_1_1_1Id,
-                systemId: defaultId,
-                parentId: m1_1_1Id,
-                title: "Relación de Mayer",
-                type: "satellite",
-                notes: `# Relación de Mayer para Gases Ideales\nDeducción termodinámica clásica que conecta las capacidades caloríficas a presión y volumen constantes.\n\n### Enunciado Matemático:\n$$C_p - C_v = R \\quad \\text{(capacidad molar)} \\quad \\text{o} \\quad c_p - c_v = R/M$$\nDonde:\n- $C_p$: Capacidad calorífica molar a presión constante ($\\text{J/(mol}\\cdot\\text{K)}$).\n- $C_v$: Capacidad calorífica molar a volumen constante ($\\text{J/(mol}\\cdot\\text{K)}$).\n- $R$: Constante universal de los gases ideales ($8.314 \\text{ J/(mol}\\cdot\\text{K)}$).\n- $M$: Masa molar del gas ($\\text{kg/mol}$).\n\n### Demostración Termodinámica:\n1. Por definición de Entalpía: $H = U + PV$\n2. Para un gas ideal, $PV = nRT$, por lo que a nivel molar ($n=1$): $H_m = U_m + RT$\n3. Derivando respecto a la temperatura $T$: $\\frac{dH_m}{dT} = \\frac{dU_m}{dT} + R$\n4. Dado que para un gas ideal $U$ y $H$ dependen exclusivamente de $T$ (ley de Joule): $C_p = \\left(\\frac{\\partial H_m}{\\partial T}\\right)_P = \\frac{dH_m}{dT}$ y $C_v = \\left(\\frac{\\partial U_m}{\\partial T}\right)_V = \\frac{dU_m}{dT}$\n5. Sustituyendo, se obtiene directamente: $$C_p - C_v = R$$\n\n### Interpretación Física:\nA volumen constante, todo el calor transferido se almacena como energía cinética molecular (aumenta $T$). A presión constante, parte de la energía térmica suministrada se consume en realizar trabajo mecánico de expansión contra la atmósfera circundante, requiriendo más energía total para aumentar un grado la temperatura.`,
-                attachments: [],
-                orbitRadius: 20,
-                orbitSpeed: -0.5,
-                color: "#a8afb8",
-                angle: 0.8
-            });
-
-            // 6. Planetoide: Segunda Ley (bajo Planeta 1)
-            const pl1_2Id = crypto.randomUUID();
-            await db.saveNode({
-                id: pl1_2Id,
-                systemId: defaultId,
-                parentId: p1Id,
-                title: "Segunda Ley y Entropía",
-                type: "planetoid",
-                notes: `# Segunda Ley y Entropía\nEl principio que establece la dirección del tiempo físico y el desorden termodinámico mediante la entropía.\n\n### Formulación de Kelvin-Planck:\nEs imposible construir un dispositivo que opere cíclicamente y cuyo único efecto sea absorber calor de un solo foco térmico y convertirlo íntegramente en trabajo mecánico útil.\n\n### Formulación de Clausius:\nEs imposible construir un dispositivo que opere cíclicamente y cuyo único efecto neto sea transferir calor desde un cuerpo frío a otro cuerpo más caliente sin aporte externo de trabajo.\n\n### Definición Clásica de Entropía ($S$):\nLa entropía es una variable de estado extensiva definida cuantitativamente para un proceso reversible elemental como:\n$$dS = \\frac{\\delta Q_{\\text{rev}}}{T}$$\nDonde:\n- $dS$: Variación diferencial de la entropía (J/K).\n- $\\delta Q_{\\text{rev}}$: Calor transferido de forma reversible e infinitesimal (J).\n- $T$: Temperatura absoluta del sistema en el equilibrio local (K).\n\n### El Principio del Aumento de Entropía:\nPara cualquier proceso físico o químico real (irreversible), se genera entropía internamente ($S_{\\text{gen}} > 0$):\n$$dS_{\\text{universo}} = dS_{\\text{sistema}} + dS_{\\text{entorno}} = dS_{\\text{sistema}} - \\frac{\\delta Q}{T_{\\text{frontera}}} \\ge 0$$\n\nQ: ¿Por qué la entropía no disminuye en sistemas aislados?\nA: Porque en un sistema aislado el flujo de calor externo $\\delta Q = 0$, lo que implica que $dS \\ge 0$. Toda irreversibilidad interna espontánea aumenta el número de configuraciones microscópicas accesibles del sistema, incrementando la entropía molecular.`,
-                attachments: [],
-                orbitRadius: 90,
-                orbitSpeed: 0.08,
-                color: "#e8c4ff",
-                angle: 2.2
-            });
-
-            // 7. Luna: Desigualdad de Clausius (bajo Planetoide 1.2)
-            const m1_2_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: m1_2_1Id,
-                systemId: defaultId,
-                parentId: pl1_2Id,
-                title: "Desigualdad de Clausius",
-                type: "moon",
-                notes: `# Desigualdad de Clausius\nTeorema fundamental derivado del segundo principio de la termodinámica que rige el comportamiento de todos los ciclos térmicos.\n\n### Enunciado General:\nPara cualquier proceso cerrado o ciclo que experimente un sistema:\n$$\\oint \\frac{\\delta Q}{T_{\\text{frontera}}} \\le 0$$\nDonde:\n- $\\delta Q$: Cantidad diferencial de calor transferido al sistema a través de la frontera (J). Es positivo si entra, negativo si sale.\n- $T_{\\text{frontera}}$: Temperatura absoluta de la sección de la frontera del sistema donde ocurre la transferencia de calor (K).\n- $\\oint$: Integral cerrada a lo largo de la trayectoria completa del ciclo.\n\n### Demostración y Casos Límite:\n1. **Ciclo Reversible**: Toda la transferencia de calor es ideal y sin fricción ni gradientes finitos de temperatura.   $$\\oint \\frac{\\delta Q_{\\text{rev}}}{T} = 0$$\n   *Esto demuestra matemáticamente que la cantidad $\\frac{\\delta Q_{\\text{rev}}}{T}$ es una diferencial exacta de una función de estado, a la cual Clausius llamó Entropía ($S$).*\n2. **Ciclo Irreversible**: El ciclo presenta rozamiento, gradientes de temperatura o procesos internos de no equilibrio.   $$\\oint \\frac{\\delta Q}{T_{\\text{frontera}}} < 0$$\n\n### Generación de Entropía ($S_{\\text{gen}}$):\nPodemos reescribir la desigualdad como una ecuación de conservación agregando el término de entropía generada, que es siempre estrictamente mayor a cero para procesos reales:\n$$\\Delta S_{\\text{sistema}} = \\int \\frac{\\delta Q}{T_{\\text{frontera}}} + S_{\\text{gen}}$$\nDonde $S_{\\text{gen}} \\ge 0$.`,
-                attachments: [],
-                orbitRadius: 40,
-                orbitSpeed: -0.2,
-                color: "#ffffba",
-                angle: 0.5
-            });
-
-            // 8. Planeta: Ciclos Termodinámicos
-            const p2Id = crypto.randomUUID();
-            await db.saveNode({
-                id: p2Id,
-                systemId: defaultId,
-                parentId: sunId,
-                title: "Ciclos y Máquinas",
-                type: "planet",
-                notes: `# Ciclos Termodinámicos y Máquinas Térmicas\nEl estudio ingenieril de los ciclos cerrados de fluidos para convertir energía térmica en trabajo mecánico continuo.\n\n### Máquinas Térmicas:\nAbsorben calor $Q_H$ de un foco caliente a temperatura $T_H$, producen trabajo neto $W_{\\text{neto}}$, y ceden calor residual $Q_C$ a un foco frío a temperatura $T_C$.\n- **Eficiencia Térmica ($\\eta$)**:\n  $$\\eta = \\frac{W_{\\text{neto}}}{Q_H} = \\frac{Q_H - |Q_C|}{Q_H} = 1 - \\frac{|Q_C|}{Q_H}$$\n  *(Unidades en SI: $Q_H$, $Q_C$, y $W$ en Joules (J); $\\eta$ es adimensional)*\n\n### Ciclos de Refrigeración y Bombas de Calor:\nUtilizan trabajo mecánico externo $W$ para forzar la transferencia de calor de un foco frío a un foco caliente.\n- **Coeficiente de Rendimiento de un Refrigerador ($\\text{COP}_{\\text{Ref}}$)**:\n  $$\\text{COP}_{\\text{Ref}} = \\frac{Q_C}{W} = \\frac{Q_C}{Q_H - Q_C}$$\n- **Coeficiente de Rendimiento de una Bomba de Calor ($\\text{COP}_{\\text{BC}}$)**:\n  $$\\text{COP}_{\\text{BC}} = \\frac{Q_H}{W} = \\frac{Q_H}{Q_H - Q_C}$$\n\n### Relación Fundamental de COP:\n$$\\text{COP}_{\\text{BC}} = \\text{COP}_{\\text{Ref}} + 1$$\n\n### Eficiencia Comparada:\nEl ciclo de Carnot establece el límite superior absoluto para cualquier máquina térmica.\n\n[grafico tipo="line" valores="100,50,20,35,100" etiquetas="1,2,3,4,1" titulo="Ciclo de Carnot en Diagrama P-V"]`,
-                attachments: [],
-                orbitRadius: 230,
-                orbitSpeed: -0.04,
-                color: "#ff007f",
-                angle: 2.0
-            });
-
-            // 9. Planetoide: Ciclo de Carnot (bajo Planeta 2)
-            const pl2_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: pl2_1Id,
-                systemId: defaultId,
-                parentId: p2Id,
-                title: "Ciclo de Carnot",
-                type: "planetoid",
-                notes: `# El Ciclo de Carnot\nUn ciclo termodinámico teórico compuesto por cuatro procesos reversibles que define el límite de eficiencia ideal de conversión térmica.\n\n### Etapas del Ciclo para un Gas Ideal (Diagrama $P-V$):\n1. **Expansión Isotérmica Reversible ($1 \\to 2$)** a temperatura alta $T_H$:\n   El sistema absorbe calor $Q_H$ del foco caliente.\n   $$Q_H = W_{1\\to 2} = nRT_H \\ln\\left(\\frac{V_2}{V_1}\\right)$$\n2. **Expansión Adiabática Reversible ($2 \\to 3$)** de $T_H$ a $T_C$:\n   El sistema realiza trabajo disminuyendo su temperatura sin intercambiar calor ($Q = 0$).\n   $$T_H V_2^{\\gamma-1} = T_C V_3^{\\gamma-1}$$\n3. **Compresión Isotérmica Reversible ($3 \\to 4$)** a temperatura baja $T_C$:\n   Se realiza trabajo sobre el gas y este cede calor $Q_C$ al foco frío.\n   $$Q_C = -nRT_C \\ln\\left(\\frac{V_3}{V_4}\\right)$$\n4. **Compresión Adiabática Reversible ($4 \\to 1$)** de $T_C$ a $T_H$:\n   El gas se calienta mediante compresión reversible adiabática sin ganar calor ($Q = 0$).\n   $$T_C V_4^{\\gamma-1} = T_H V_1^{\\gamma-1}$$\n\n### Relación de Volúmenes:\nCombinando las relaciones adiabáticas, se demuestra que:\n$$\\frac{V_2}{V_1} = \\frac{V_3}{V_4}$$\nLo que permite simplificar las expresiones de calor absorbido y cedido.`,
-                attachments: [],
-                orbitRadius: 75,
-                orbitSpeed: 0.12,
-                color: "#ffdfba",
-                angle: 1.2
-            });
-
-            // 10. Luna: Eficiencia de Carnot (bajo Planetoide 2.1)
-            const m2_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: m2_1_1Id,
-                systemId: defaultId,
-                parentId: pl2_1Id,
-                title: "Eficiencia de Carnot",
-                type: "moon",
-                notes: `# Eficiencia de Carnot\nEl límite termodinámico fundamental de eficiencia térmica de cualquier máquina térmica que opera entre dos límites de temperatura.\n\n### Fórmula de Eficiencia de Carnot ($\\eta_{\\text{Carnot}}$):\n$$\\eta_{\\text{Carnot}} = 1 - \\frac{T_C}{T_H}$$\nDonde:\n- $\\eta_{\\text{Carnot}}$: Eficiencia máxima adimensional ($0 \\le \\eta < 1$).\n- $T_C$: Temperatura absoluta del foco frío (K).\n- $T_H$: Temperatura absoluta del foco caliente (K).\n\n### Deducción Termodinámica:\n1. A partir del ciclo de Carnot ideal: $Q_H = nRT_H \\ln\\left(\\frac{V_2}{V_1}\\right)$ y $Q_C = -nRT_C \\ln\\left(\\frac{V_3}{V_4}\\right)$\n2. Como se cumple que $\\frac{V_2}{V_1} = \\frac{V_3}{V_4}$, dividimos ambos términos: $\\frac{|Q_C|}{Q_H} = \\frac{T_C}{T_H}$\n3. Sustituyendo esta relación en la ecuación de eficiencia térmica general ($\\eta = 1 - \\frac{|Q_C|}{Q_H}$), obtenemos:\n   $$\\eta_{\\text{Carnot}} = 1 - \\frac{T_C}{T_H}$$\n\nQ: ¿Por qué no se puede alcanzar una eficiencia del 100% ($\\eta = 1$)?\nA: Alcanzar $\\eta = 1$ requiere que el foco frío esté a $T_C = 0 \\text{ K}$ (Cero Absoluto). La tercera ley de la termodinámica imposibilita enfriar cualquier foco térmico real a $T_C = 0 \\text{ K}$ en un número finito de pasos.`,
-                attachments: [],
-                orbitRadius: 35,
-                orbitSpeed: -0.3,
-                color: "#baffc9",
-                angle: 2.5
-            });
-
-            // 11. Satélite: Teorema de Carnot (bajo Luna 2.1.1)
-            const s2_1_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: s2_1_1_1Id,
-                systemId: defaultId,
-                parentId: m2_1_1Id,
-                title: "Teorema de Carnot",
-                type: "satellite",
-                notes: `# Teorema de Carnot\nEstablece los límites máximos de eficiencia para cualquier motor térmico, deducidos de las leyes fundamentales.\n\n### Primer Teorema:\nNingún motor térmico real que opere de manera irreversible entre dos límites térmicos dados puede ser más eficiente que una máquina de Carnot reversible que opere entre los mismos dos límites:\n$$\\eta_{\\text{irreversible}} \\le \\eta_{\\text{reversible}}$$\n\n### Segundo Teorema:\nTodos los motores térmicos reversibles (como la máquina de Carnot, Stirling o Ericsson ideales) que operen entre los mismos dos focos térmicos constantes deben poseer exactamente la misma eficiencia:\n$$\\eta_{\\text{rev, A}} = \\eta_{\\text{rev, B}} = 1 - \\frac{T_C}{T_H}$$\n\n### Demostración del Teorema:\nSe demuestra por contradicción. Si supusiéramos la existencia de un motor super-eficiente con eficiencia $\\eta_X > \\eta_{\\text{Carnot}}$, podríamos acoplarlo mecánicamente a una máquina de Carnot funcionando a la inversa como refrigerador. El trabajo generado por el motor $X$ alimentaría al refrigerador de Carnot. El resultado neto de este sistema compuesto sería la transferencia de calor del foco frío al foco caliente sin recibir trabajo externo, violando de forma directa la formulación de la Segunda Ley de Clausius.`,
-                attachments: [],
-                orbitRadius: 20,
-                orbitSpeed: 0.6,
-                color: "#a8afb8",
-                angle: 1.8
-            });
-
-            // 12. Planeta: Potenciales Termodinámicos
-            const p3Id = crypto.randomUUID();
-            await db.saveNode({
-                id: p3Id,
-                systemId: defaultId,
-                parentId: sunId,
-                title: "Potenciales de Maxwell",
-                type: "planet",
-                notes: `# Potenciales Termodinámicos y Relaciones de Maxwell\nLos potenciales termodinámicos son funciones de estado con unidades de energía utilizadas para analizar el equilibrio bajo diferentes restricciones físicas externas.\n\n### Definiciones Matemáticas (Restricciones del Sistema):\n1. **Energía Interna ($U$)**: Medida en sistemas aislados.\n   $$dU = T\\,dS - P\\,dV + \\sum_i \\mu_i \\, dN_i$$\n2. **Entalpía ($H$)**: Para procesos a presión constante.\n   $$H = U + PV \\implies dH = T\\,dS + V\\,dP + \\sum_i \\mu_i \\, dN_i$$\n3. **Energía Libre de Helmholtz ($A$)**: Para procesos a temperatura y volumen constantes.\n   $$A = U - TS \\implies dA = -S\\,dT - P\\,dV + \\sum_i \\mu_i \\, dN_i$$\n4. **Energía Libre de Gibbs ($G$)**: Para procesos a temperatura y presión constantes.\n   $$G = H - TS \\implies dG = -S\\,dT + V\\,dP + \\sum_i \\mu_i \\, dN_i$$\n\nDonde:\n- $U, H, A, G$: Potenciales termodinámicos en Joules (J).\n- $T$: Temperatura absoluta (K).\n- $P$: Presión del sistema (Pa).\n- $V$: Volumen del sistema ($\\text{m}^3$).\n- $S$: Entropía del sistema (J/K).\n- $N_i$: Moles de la especie química $i$.\n- $\\mu_i$: Potencial químico de la especie $i$ (J/mol).\n\n### Transformadas de Legendre:\nLos potenciales se derivan uno del otro intercambiando variables independientes conjugadas (ej. cambiar $S$ por $T$, o $V$ por $P$) mediante sumas de productos de variables conjugadas, manteniendo toda la información termodinámica original del sistema.`,
-                attachments: [],
-                orbitRadius: 330,
-                orbitSpeed: 0.03,
-                color: "#bae1ff",
-                angle: 3.5
-            });
-
-            // 13. Planetoide: Energía de Gibbs (bajo Planeta 3)
-            const pl3_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: pl3_1Id,
-                systemId: defaultId,
-                parentId: p3Id,
-                title: "Energía Libre de Gibbs",
-                type: "planetoid",
-                notes: `# Energía Libre de Gibbs ($G$)\nEl potencial termodinámico de mayor relevancia en química y ciencia de materiales, que rige la espontaneidad a presión y temperatura constantes.\n\n### Definición Matemática:\n$$G = H - TS = U + PV - TS$$\nDonde:\n- $G$: Energía libre de Gibbs (J).\n- $H$: Entalpía del sistema (J).\n- $T$: Temperatura absoluta (K).\n- $S$: Entropía del sistema (J/K).\n\n### Criterio de Espontaneidad y Equilibrio:\nPara cualquier cambio de fase o reacción química a temperatura ($T$) y presión ($P$) constantes, el cambio de energía libre de Gibbs es:\n$$dG_{T,P} = dH - T\\,dS \\le 0$$\n- **$dG_{T,P} < 0$**: Proceso exergónico espontáneo (el sistema libera energía útil).\n- **$dG_{T,P} = 0$**: El sistema está en equilibrio termodinámico macroscópico.\n- **$dG_{T,P} > 0$**: Proceso endergónico no espontáneo (requiere energía externa para ocurrir).\n\n### Relación con la Afinidad Química:\nEn términos del potencial químico $\\mu_i$ y la composición del sistema:\n$$G = \\sum_{i} \\mu_i N_i \\implies dG_{T,P} = \\sum_{i} \\mu_i \\, dN_i$$\n\n> [!IMPORTANT]\n> El valor mínimo de la energía de Gibbs define el estado termodinámicamente más estable del sistema en las condiciones de presión y temperatura constantes.`,
-                attachments: [],
-                orbitRadius: 70,
-                orbitSpeed: -0.1,
-                color: "#ffd3b6",
-                angle: 0.8
-            });
-
-            // 14. Luna: Ecuación de Clapeyron (bajo Planetoide 3.1)
-            const m3_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: m3_1_1Id,
-                systemId: defaultId,
-                parentId: pl3_1Id,
-                title: "Ecuación de Clapeyron",
-                type: "moon",
-                notes: `# Ecuación de Clapeyron\nLa ecuación fundamental que rige el equilibrio de fase de cualquier sustancia de un componente puro.\n\n### Enunciado de Clapeyron:\n$$\\frac{dP}{dT} = \\frac{\\Delta H}{T \\, \\Delta V}$$\nDonde:\n- $P$: Presión de coexistencia o presión de vapor de la fase (Pa).\n- $T$: Temperatura absoluta de transición de fase (K).\n- $\\Delta H$: Entalpía molar de la transición de fase (ej. fusión, vaporización, sublimación) ($\\text{J/mol}$).\n- $\\Delta V$: Cambio en el volumen específico molar de la transición ($\\text{m}^3\\text{/mol}$): $\\Delta V = V_{\\text{fase final}} - V_{\\text{fase inicial}}$\n\n### Derivación Matemática:\n1. En condiciones de equilibrio de fases coexistentes (fases $\\alpha$ y $\\beta$), los potenciales químicos moleculares de ambos estados deben ser idénticos: $\\mu_{\\alpha}(T, P) = \\mu_{\\beta}(T, P)$\n2. Para un desplazamiento infinitesimal sobre la línea de coexistencia: $d\\mu_{\\alpha} = d\\mu_{\\beta}$\n3. Recordando la relación diferencial para el potencial químico molar ($d\\mu = -S_m dT + V_m dP$): $$-S_{m,\\alpha} dT + V_{m,\\alpha} dP = -S_{m,\\beta} dT + V_{m,\\beta} dP$$\n4. Reordenando y agrupando términos: $(V_{m,\\beta} - V_{m,\\alpha}) dP = (S_{m,\\beta} - S_{m,\\alpha}) dT \\implies \\frac{dP}{dT} = \\frac{\\Delta S}{\\Delta V}$\n5. Como la transición de fase es reversible e isoterma, la entropía de cambio es $\\Delta S = \\frac{\\Delta H}{T}$, lo que nos da:\n   $$\\frac{dP}{dT} = \\frac{\\Delta H}{T \\, \\Delta V}$$`,
-                attachments: [],
-                orbitRadius: 40,
-                orbitSpeed: 0.25,
-                color: "#a8e6cf",
-                angle: 1.5
-            });
-
-            // 15. Satélite: Clausius-Clapeyron (bajo Luna 3.1.1)
-            const s3_1_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: s3_1_1_1Id,
-                systemId: defaultId,
-                parentId: m3_1_1Id,
-                title: "Clausius-Clapeyron",
-                type: "satellite",
-                notes: `# Ecuación de Clausius-Clapeyron\nSimplificación física de la ecuación de Clapeyron aplicada específicamente a transiciones de fase gaseosa-condensada.\n\n### Enunciado Integrado:\n$$\\ln\\left(\\frac{P_2}{P_1}\\right) = -\\frac{\\Delta H_{\\text{vap}}}{R} \\left(\\frac{1}{T_2} - \\frac{1}{T_1}\\right)$$\nDonde:\n- $P_1, P_2$: Presiones de vapor de la sustancia a temperaturas absolutas $T_1$ y $T_2$ respectively.\n- $\\Delta H_{\\text{vap}}$: Entalpía de vaporización (o sublimación) molar de la sustancia ($\\text{J/mol}$).\n- $R$: Constante universal de los gases ideales ($8.314 \\text{ J/(mol K)}$).\n\n### Supuestos de la Derivación:\n1. **Volumen Despreciable**: El volumen específico molar de la fase gaseosa ($V_g$) es infinitamente mayor que el de la líquida ($V_l$), por lo que $\\Delta V = V_g - V_l \\approx V_g$.\n2. **Comportamiento de Gas Ideal**: El vapor se comporta como un gas ideal en el rango de equilibrio, lo que permite sustituir $V_g = \\frac{RT}{P}$.\n3. Sustituyendo en Clapeyron:\n   $$\\frac{dP}{dT} = \\frac{\\Delta H_{\\text{vap}}}{T \\left(\\frac{RT}{P}\right)} \\implies \\frac{d\\ln P}{dT} = \\frac{\\Delta H_{\\text{vap}}}{R T^2}$$\n4. Integrando con $\\Delta H_{\\text{vap}}$ constante, obtenemos directamente la ecuación integrada.`,
-                attachments: [],
-                orbitRadius: 20,
-                orbitSpeed: -0.6,
-                color: "#a8afb8",
-                angle: 0.5
-            });
-
-            // 16. Planetoide: Relaciones de Maxwell (bajo Planeta 3)
-            const pl3_2Id = crypto.randomUUID();
-            await db.saveNode({
-                id: pl3_2Id,
-                systemId: defaultId,
-                parentId: p3Id,
-                title: "Relaciones de Maxwell",
-                type: "planetoid",
-                notes: `# Relaciones de Maxwell\nIdentidades matemáticas que conectan derivadas parciales de las variables de estado termodinámicas primarias ($P, V, T, S$).\n\n### Origen Matemático:\nSi una función diferencial de estado $df = M dx + N dy$ es exacta, sus segundas derivadas parciales cruzadas son idénticas: $\\left(\\frac{\\partial M}{\\partial y}\\right)_x = \\left(\\frac{\\partial N}{\\partial x}\\right)_y$\n\n### Las Cuatro Relaciones Clásicas de Maxwell:\n1. **De la Energía Interna** ($dU = T\\,dS - P\\,dV$):\n   $$\\left(\\frac{\\partial T}{\\partial V}\\right)_S = -\\left(\\frac{\\partial P}{\\partial S}\\right)_V$$\n2. **De la Entalpía** ($dH = T\\,dS + V\\,dP$):\n   $$\\left(\\frac{\\partial T}{\\partial P}\\right)_S = \\left(\\frac{\\partial V}{\\partial S}\\right)_P$$\n3. **De la Energía de Helmholtz** ($dA = -S\\,dT - P\\,dV$):\n   $$\\left(\\frac{\\partial S}{\\partial V}\\right)_T = \\left(\\frac{\\partial P}{\\partial T}\right)_V$$\n4. **De la Energía de Gibbs** ($dG = -S\\,dT + V\\,dP$):\n   $$\\left(\\frac{\\partial S}{\\partial P}\\right)_T = -\\left(\\frac{\\partial V}{\\partial T}\\right)_P$$\n\nDonde:\n- $T$: Temperatura absoluta (K).\n- $P$: Presión (Pa).\n- $V$: Volumen ($\\text{m}^3$).\n- $S$: Entropía (J/K).\n\n### Importancia Científica:\nPermiten determinar indirectamente los cambios de variables que no se pueden medir experimentalmente en el laboratorio de forma sencilla (como la Entropía $S$), a partir de variables fácilmente medibles ($P, V, T$).`,
-                attachments: [],
-                orbitRadius: 105,
-                orbitSpeed: 0.06,
-                color: "#c7ceea",
-                angle: 2.5
-            });
-
-            // 17. Planeta: Física Estadística
-            const p4Id = crypto.randomUUID();
-            await db.saveNode({
-                id: p4Id,
-                systemId: defaultId,
-                parentId: sunId,
-                title: "Física Estadística",
-                type: "planet",
-                notes: `# Física Estadística\nLa disciplina que une el mundo cuántico y molecular microscópico con los principios macroscópicos de la termodinámica.\n\n### Postulado de Probabilidad a Priori Igual:\nEn un sistema aislado en equilibrio térmico, todos los microestados compatibles con las restricciones externas de volumen, partículas y energía son igualmente probables de ocurrir.\n\n### Colectivos Estadísticos (Ensembles):\n1. **Microcanónico ($N, V, E$)**: Representa sistemas aislados. La energía total $E$ es constante.\n2. **Canónico ($N, V, T$)**: Sistema cerrado en contacto térmico con un foco térmico externo a temperatura constante $T$.\n3. **Gran Canónico ($\\mu, V, T$)**: Sistema abierto que puede intercambiar calor y partículas con el exterior a temperatura $T$ y potencial químico $\\mu$.\n\n### Conexión Microscópica-Macroscópica:\nLa entropía es el puente directo entre ambos regímenes, cuantificando la probabilidad y densidad de estados mecánicos elementales:\n$$A = -k_B T \\ln Z$$\nDonde:\n- $A$: Energía libre de Helmholtz (J).\n- $k_B$: Constante de Boltzmann ($1.3806 \\times 10^{-23} \\text{ J/K}$).\n- $T$: Temperatura absoluta (K).\n- $Z$: Función de partición estadística del colectivo.`,
-                attachments: [],
-                orbitRadius: 440,
-                orbitSpeed: -0.02,
-                color: "#ffd3b6",
-                angle: 4.8
-            });
-
-            // 18. Planetoide: Entropía de Boltzmann (bajo Planeta 4)
-            const pl4_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: pl4_1Id,
-                systemId: defaultId,
-                parentId: p4Id,
-                title: "Entropía de Boltzmann",
-                type: "planetoid",
-                notes: `# La Fórmula de Entropía de Boltzmann\nLa ecuación de la termodinámica estadística que conecta el desorden microscópico y cuántico molecular con la variable macroscópica de la entropía.\n\n### Fórmula de Boltzmann:\n$$S = k_B \\ln \\Omega$$\nDonde:\n- $S$: Entropía termodinámica macroscópica (J/K).\n- $k_B$: Constante fundamental de Boltzmann ($1.3806 \\times 10^{-23} \\text{ J/K}$).\n- $\\Omega$: Multiplicidad termodinámica o el número total de microestados moleculares mecánicos individuales (posiciones y momentos cuánticos en el espacio de fases) compatibles con el macroestado en equilibrio.\n\n### Implicación para la Tercera Ley:\nAl aproximarse la temperatura a $0\\text{ K}$, los sistemas físicos caen al microestado base de mínima energía degenerada. Si este estado base es único ($\\Omega = 1$):\n$$S = k_B \\ln(1) = 0$$\nLo que justifica estadísticamente la Tercera Ley de la Termodinámica de Planck.`,
-                attachments: [],
-                orbitRadius: 85,
-                orbitSpeed: 0.09,
-                color: "#ffb3ba",
-                angle: 1.0
-            });
-
-            // 19. Luna: Función de Partición (bajo Planetoide 4.1)
-            const m4_1_1Id = crypto.randomUUID();
-            await db.saveNode({
-                id: m4_1_1Id,
-                systemId: defaultId,
-                parentId: pl4_1Id,
-                title: "Función de Partición",
-                type: "moon",
-                notes: `# Función de Partición ($Z$)\nEl parámetro normalizador en física estadística que resume de forma completa los estados energéticos moleculares accesibles de un sistema en equilibrio.\n\n### Definición Matemática (Colectivo Canónico):\n$$Z = \\sum_{i} e^{-\\beta E_i}$$\nDonde:\n- $Z$: Función de partición cuántica/estadística (adimensional).\n- $E_i$: Nivel de energía cuántico discreto accesible para el microestado molecular $i$ (J).\n- $\\beta$: Parámetro térmico fundamental ($\\text{J}^{-1}$), definido como: $$\\beta = \\frac{1}{k_B T}$$\n  *(donde $k_B$ es la constante de Boltzmann y $T$ es la temperatura absoluta del sistema)*\n\n### Probabilidad de Ocupación de un Estado ($P_i$):\nLa probabilidad de encontrar el sistema en un microestado específico $i$ sigue la distribución de Boltzmann: $P_i = \\frac{e^{-\\beta E_i}}{Z}$\n\n### Cálculo de Variables Macroscópicas a partir de $Z$:\n1. **Energía Interna Media ($\\langle E \\rangle$)**:\n   $$\\langle E \\rangle = -\\left(\\frac{\\partial \\ln Z}{\\partial \\beta}\\right)_V = k_B T^2 \\left(\\frac{\\partial \\ln Z}{\\partial T}\\right)_V$$\n2. **Entropía Estadística ($S$)**:\n   $$S = k_B \\ln Z + \\frac{\\langle E \\rangle}{T}$$\n3. **Presión Media ($\\langle P \\rangle$)**:\n   $$\\langle P \\rangle = \\frac{1}{\\beta} \\left(\\frac{\\partial \\ln Z}{\\partial V}\\right)_T$$\n\n> [!TIP]\n> A partir de $Z$ se puede calcular la energía interna media del sistema:\n> $$\\langle E \\rangle = -\\frac{\\partial \\ln Z}{\\partial \\beta}$$`,
-                attachments: [],
-                orbitRadius: 45,
-                orbitSpeed: -0.22,
-                color: "#ff8b94",
-                angle: 2.0
-            });
-
-            // Seeder de Tareas Pendientes para Termodinámica Avanzada
-            await db.saveTask({
+        async function saveNodeRecursive(nodeData, systemId, parentId = null) {
+            const node = {
                 id: crypto.randomUUID(),
-                systemId: defaultId,
-                title: "Deducir las Relaciones de Maxwell",
-                createdAt: new Date()
-            });
-            await db.saveTask({
-                id: crypto.randomUUID(),
-                systemId: defaultId,
-                title: "Calcular el cambio de entropía de mezcla",
-                createdAt: new Date()
-            });
-            await db.saveTask({
-                id: crypto.randomUUID(),
-                systemId: defaultId,
-                title: "Resolver la paradoja de Gibbs",
-                createdAt: new Date()
-            });
+                systemId: systemId,
+                parentId: parentId,
+                title: nodeData.title,
+                type: nodeData.type,
+                notes: nodeData.notes,
+                attachments: nodeData.attachments || [],
+                orbitRadius: nodeData.orbitRadius || 0,
+                orbitSpeed: nodeData.orbitSpeed || 0,
+                color: nodeData.color || "#ffffff",
+                angle: nodeData.angle !== undefined ? nodeData.angle : Math.random() * Math.PI * 2
+            };
+            await db.saveNode(node);
+            if (nodeData.children && nodeData.children.length > 0) {
+                for (const child of nodeData.children) {
+                    await saveNodeRecursive(child, systemId, node.id);
+                }
+            }
+        }
 
-            systems.push(defaultSystem);
+        for (const sysData of defaultSystemsData) {
+            const hasSystem = systems.some(sys => sys.name === sysData.name);
+            if (!hasSystem) {
+                const defaultId = crypto.randomUUID();
+                const defaultSystem = { id: defaultId, name: sysData.name, createdAt: new Date() };
+                await db.saveSystem(defaultSystem);
+                
+                // Recursively save sun and child nodes
+                await saveNodeRecursive(sysData.sun, defaultId);
+                
+                // Save system tasks (stars)
+                if (sysData.tasks) {
+                    for (const taskTitle of sysData.tasks) {
+                        await db.saveTask({
+                            id: crypto.randomUUID(),
+                            systemId: defaultId,
+                            title: taskTitle,
+                            createdAt: new Date()
+                        });
+                    }
+                }
+                systems.push(defaultSystem);
+            }
         }
 
         systems.forEach(sys => {
@@ -643,8 +370,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
 
         if (!currentSystemId) {
-            currentSystemId = systems[0].id;
+            const savedSystemId = localStorage.getItem("orbimind_selected_system_id");
+            if (savedSystemId && systems.some(sys => sys.id === savedSystemId)) {
+                currentSystemId = savedSystemId;
+            } else {
+                currentSystemId = systems[0].id;
+            }
         }
+        localStorage.setItem("orbimind_selected_system_id", currentSystemId);
         selectSystem.value = currentSystemId;
         await loadSystemData(currentSystemId);
         renderCustomOptions();
@@ -1073,10 +806,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function openAttachment(file) {
         const w = window.open();
+        const fileUrl = (file.data.startsWith('data:') || file.data.startsWith('http://') || file.data.startsWith('https://')) 
+            ? file.data 
+            : window.location.origin + '/' + file.data;
         if (file.type.includes('pdf')) {
-            w.document.write(`<iframe src="${file.data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+            w.document.write(`<iframe src="${fileUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
         } else {
-            w.document.write(`<body style="margin:0; background:#020208; display:flex; align-items:center; justify-content:center;"><img src="${file.data}" style="max-width:100%; max-height:100vh; object-fit:contain; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius:8px;"></body>`);
+            w.document.write(`<body style="margin:0; background:#020208; display:flex; align-items:center; justify-content:center;"><img src="${fileUrl}" style="max-width:100%; max-height:100vh; object-fit:contain; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border-radius:8px;"></body>`);
         }
         w.document.title = file.name;
     }
@@ -1174,6 +910,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     selectSystem.addEventListener("change", async (e) => {
         currentSystemId = e.target.value;
+        localStorage.setItem("orbimind_selected_system_id", currentSystemId);
         await loadSystemData(currentSystemId);
         renderCustomOptions();
         showToast(`Cargado universo: ${selectSystem.options[selectSystem.selectedIndex].text}`);
@@ -1886,7 +1623,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const currentAngle = (orbiter.angle || 0) + elapsedSeconds * (orbiter.orbitSpeed || 0.5) * 0.4;
                 const ox = x0 + Math.cos(currentAngle) * miniOrbitRadius;
                 const oy = y0 + Math.sin(currentAngle) * miniOrbitRadius;
-                const oRadius = orbiter.type === "satellite" ? 3.5 : (orbiter.type === "moon" ? 4 : 4.5);
+                const oRadius = orbiter.type === "satellite" ? 4.5 : (orbiter.type === "moon" ? 5 : 5.5);
 
                 drawnOrbiters.push({
                     node: orbiter,
