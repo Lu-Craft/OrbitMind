@@ -1,4 +1,4 @@
-const CACHE_NAME = "orbimind-cache-v46";
+const CACHE_NAME = "orbimind-cache-v47";
 const ASSETS = [
   "index.html",
   "style.css",

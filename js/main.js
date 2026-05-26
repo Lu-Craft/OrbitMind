@@ -4,12 +4,12 @@ import { SpaceEngine } from './spaceEngine.js';
 import { VoiceDictation } from './voiceDictation.js';
 import { parseMarkdown } from './markdownParser.js';
 import { getNodeColor, hexToRgb } from './utils.js';
-import { initTutorial } from './tutorial.js?v=46';
+import { initTutorial } from './tutorial.js?v=47';
 import {
     exportSystemToJSON,
     importSystemFromJSON
 } from './sync.js';
-import { defaultSystemsData } from './defaultSystems.js?v=46';
+import { defaultSystemsData } from './defaultSystems.js?v=47';
 
 document.addEventListener("DOMContentLoaded", async () => {
     // PWA Cache Buster: force hard reload if script query version changes
