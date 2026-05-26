@@ -71,3 +71,39 @@ El proyecto utiliza una estética visual moderna y futurista basada en *Dark Gla
     ├── sync.js           # Gestor de exportación/importación de JSON
     ├── tutorial.js       # Secuencia interactiva de ayuda guiada para el usuario
     └── utils.js          # Funciones auxiliares comunes
+```
+
+---
+
+## 🚀 Cómo Ejecutar el Proyecto en Local
+
+Dado que la aplicación es una PWA y utiliza módulos de JavaScript (`type="module"`), no se puede ejecutar abriendo el archivo `index.html` directamente en el navegador debido a políticas de seguridad (CORS). Requiere un servidor local.
+
+### En Windows (Recomendado)
+1.  Haz doble clic en el archivo **`run_server.bat`**.
+2.  Este script iniciará automáticamente un servidor web ligero en PowerShell (`serve.ps1`) en el puerto **8002** y abrirá tu navegador por defecto en la dirección:
+    ```
+    http://localhost:8002
+    ```
+3.  ¡Listo! Puedes instalar la aplicación como una aplicación nativa de escritorio haciendo clic en el icono de instalación en la barra de direcciones de tu navegador (Chrome/Edge).
+
+### Usando cualquier otro servidor web local (Python, Node, etc.)
+Si estás en macOS/Linux o prefieres otra herramienta:
+
+*   **Con Python:**
+    ```bash
+    python -m http.server 8000
+    ```
+*   **Con Node.js (http-server):**
+    ```bash
+    npx http-server -p 8000
+    ```
+Abre tu navegador en `http://localhost:8000`.
+
+---
+
+## 💾 Sistemas por Defecto Incluidos
+La aplicación viene cargada por defecto con tres sistemas de estudio estructurados asimétricamente para servir de ejemplo:
+1.  **Termodinámica Avanzada:** Con conceptos de Leyes Fundamentales, Potenciales Termodinámicos y coeficientes físicos.
+2.  **Psicología Social y Relaciones Humanas:** Centrado en Cognición, Influencia (Milgram, Stanford, Asch) y teorías de Identidad Social (Tajfel).
+3.  **Historia del Arte Contemporáneo:** Repaso de Vanguardias, Dadaísmo, Fauvismo, Cubismo y conceptualizaciones estéticas contemporáneas.

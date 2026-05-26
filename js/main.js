@@ -960,12 +960,25 @@ document.addEventListener("DOMContentLoaded", async () => {
             "¿Eliminar Sistema Solar?", 
             `¿Estás absolutamente seguro de que deseas eliminar el sistema solar "${systemName}" completo? Esto borrará permanentemente todos sus planetas, satélites, notas, tareas y archivos adjuntos.`,
             async () => {
-                await db.deleteSystem(currentSystemId);
-                showToast(`Sistema "${systemName}" eliminado`);
+                // Cerrar barra lateral de detalles si estuviese abierta
+                closeSidebar();
                 
-                // Reiniciar el ID actual para que loadSystemsList seleccione el primero disponible
-                currentSystemId = null;
-                await loadSystemsList();
+                // Desactivar interacciones en toda la UI
+                document.body.style.pointerEvents = "none";
+                
+                // Iniciar la animación de destrucción
+                engine.triggerSystemDestruction(async () => {
+                    // Borrar de base de datos una vez culminada la animación
+                    await db.deleteSystem(currentSystemId);
+                    showToast(`Sistema "${systemName}" eliminado`);
+                    
+                    // Reiniciar el ID actual para que loadSystemsList seleccione el primero disponible
+                    currentSystemId = null;
+                    await loadSystemsList();
+                    
+                    // Reactivar interacciones en la UI
+                    document.body.style.pointerEvents = "auto";
+                });
             }
         );
     });

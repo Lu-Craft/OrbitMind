@@ -37,6 +37,15 @@ export class SpaceEngine {
         this.nebulae = [];
         this.shootingStars = [];
         this.particles = [];
+        this.worldParticles = []; // World-space particles (for destruction effects)
+        
+        // Propiedades de Animación de Destrucción de Sistema
+        this.destructionActive = false;
+        this.destructionTimer = 0;
+        this.destructionDuration = 5.0;
+        this.destructionCallback = null;
+        this.supernovaTriggered = false;
+        this.destructionShockwaveRadius = 0;
         
         // Propiedades de Escaneo de Búsqueda
         this.scanPulseActive = false;
@@ -219,11 +228,48 @@ export class SpaceEngine {
         }
     }
 
+    triggerSystemDestruction(callback) {
+        this.destructionActive = true;
+        this.destructionTimer = 0;
+        this.destructionCallback = callback;
+        this.supernovaTriggered = false;
+        this.destructionShockwaveRadius = 0;
+        this.worldParticles = [];
+        
+        // Guardar las órbitas originales para los planetas y satélites
+        this.nodes.forEach(node => {
+            if (node.type !== "sun") {
+                const parentNode = this.nodes.find(n => n.id === node.parentId);
+                const scale = this.getNodeScale(node);
+                let baseRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
+                if (parentNode && parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined) {
+                    baseRadius *= parentNode.orbitExpansion;
+                }
+                
+                node.destructionOrbitRadius = baseRadius;
+                node.originalDestructionOrbitRadius = baseRadius;
+                
+                const siblings = this.nodes.filter(n => n.parentId === node.parentId).sort((a, b) => a.id.localeCompare(b.id));
+                const index = siblings.indexOf(node);
+                const parentRot = this.parentRotations[node.parentId] || 0;
+                node.destructionAngle = siblings.length > 0 ? (index * 2 * Math.PI / siblings.length) + parentRot : parentRot;
+                node.isConsumed = false;
+            }
+        });
+    }
+
+    triggerWorldExplosion(x, y, color = "#ffeb3b") {
+        for (let i = 0; i < 35; i++) {
+            this.worldParticles.push(new Particle(x, y, color));
+        }
+    }
+
     initEvents() {
         window.addEventListener("resize", () => this.resize());
 
         // Mouse Down (Arrastre o Click)
         this.canvas.addEventListener("mousedown", (e) => {
+            if (this.destructionActive) return;
             if (e.button === 0) { // Click izquierdo
                 const mx = e.clientX;
                 const my = e.clientY;
@@ -254,6 +300,7 @@ export class SpaceEngine {
 
         // Mouse Move
         window.addEventListener("mousemove", (e) => {
+            if (this.destructionActive) return;
             this.mouseX = e.clientX;
             this.mouseY = e.clientY;
 
@@ -275,12 +322,14 @@ export class SpaceEngine {
 
         // Mouse Up
         window.addEventListener("mouseup", () => {
+            if (this.destructionActive) return;
             this.isDragging = false;
         });
 
         // Wheel (Zoom)
         this.canvas.addEventListener("wheel", (e) => {
             e.preventDefault();
+            if (this.destructionActive) return;
             const zoomIntensity = 0.15;
             const mouseBeforeZoom = this.screenToWorld(e.clientX, e.clientY);
 
@@ -301,6 +350,7 @@ export class SpaceEngine {
 
         // Double Click
         this.canvas.addEventListener("dblclick", (e) => {
+            if (this.destructionActive) return;
             const worldPos = this.screenToWorld(e.clientX, e.clientY);
             const clickedNode = this.getNodeAtPosition(worldPos.x, worldPos.y);
 
@@ -409,17 +459,21 @@ export class SpaceEngine {
         }
 
         const scale = node.currentScale !== undefined ? node.currentScale : 1.0;
-        let orbitRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
+        let orbitRadius = (this.destructionActive && node.destructionOrbitRadius !== undefined) 
+            ? node.destructionOrbitRadius 
+            : (this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale));
         
         const parentNode = this.nodes.find(n => n.id === node.parentId);
-        if (parentNode && parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined) {
+        if (parentNode && parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined && (!this.destructionActive || node.destructionOrbitRadius === undefined)) {
             orbitRadius *= parentNode.orbitExpansion;
         }
         
         const siblings = this.nodes.filter(n => n.parentId === node.parentId).sort((a, b) => a.id.localeCompare(b.id));
         const index = siblings.indexOf(node);
         const parentRot = this.parentRotations[node.parentId] || 0;
-        const angle = siblings.length > 0 ? (index * 2 * Math.PI / siblings.length) + parentRot : parentRot;
+        const angle = (this.destructionActive && node.destructionAngle !== undefined)
+            ? node.destructionAngle
+            : (siblings.length > 0 ? (index * 2 * Math.PI / siblings.length) + parentRot : parentRot);
 
         if (node.parentId === this.currentParentId) {
             return {
@@ -482,11 +536,107 @@ export class SpaceEngine {
     update(dt) {
         const delta = Math.min(dt, 0.1);
 
+        // Update world-space particles
+        this.worldParticles.forEach(p => p.update(delta));
+        this.worldParticles = this.worldParticles.filter(p => p.alpha > 0);
+
+        if (this.destructionActive) {
+            this.destructionTimer += delta;
+            
+            // 1. Zoom and pan focus on center
+            this.followedNode = null;
+            this.selectedNode = null;
+            this.targetZoom = 0.85; // slightly zoom out to see the collapse
+            this.panX += (0 - this.panX) * 5 * delta;
+            this.panY += (0 - this.panY) * 5 * delta;
+
+            const sunNode = this.nodes.find(n => n.type === "sun");
+            const otherNodes = this.nodes.filter(n => n.type !== "sun");
+
+            if (this.destructionTimer <= 3.0) {
+                // Phase 1: Sun expands, planets spiral in
+                const t = this.destructionTimer / 3.0; // 0 to 1
+
+                if (sunNode) {
+                    sunNode.currentScale = 1.0 + t * 6.5; 
+                }
+
+                otherNodes.forEach(n => {
+                    if (n.originalDestructionOrbitRadius === undefined) {
+                        n.originalDestructionOrbitRadius = n.destructionOrbitRadius;
+                    }
+                    if (n.destructionAngle === undefined) n.destructionAngle = Math.random() * Math.PI * 2;
+                    n.destructionAngle += (10.0 * t + 2.0) * delta; 
+                    
+                    n.destructionOrbitRadius = n.originalDestructionOrbitRadius * (1.0 - t * 1.15); // spirals in
+                    if (n.destructionOrbitRadius < 0) n.destructionOrbitRadius = 0;
+
+                    const pos = this.getNodeAbsolutePosition(n);
+                    const dist = Math.hypot(pos.x, pos.y);
+                    const sunR = sunNode ? this.getNodeRadius(sunNode) : 55;
+
+                    if (dist <= sunR && !n.isConsumed) {
+                        this.triggerWorldExplosion(pos.x, pos.y, n.color || "#ffffff");
+                        n.currentScale = 0;
+                        n.isConsumed = true;
+                    } else if (!n.isConsumed) {
+                        n.currentScale = this.getNodeScale(n) * (1.0 - t * 0.5);
+                    }
+                });
+            } else if (this.destructionTimer <= 3.5) {
+                // Phase 2: Collapse & Supernova
+                const t = (this.destructionTimer - 3.0) / 0.5; // 0 to 1
+                
+                if (!this.supernovaTriggered) {
+                    this.supernovaTriggered = true;
+                    // Trigger a massive particle burst at the center in world space
+                    for (let i = 0; i < 150; i++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 450 + 150;
+                        const color = i % 3 === 0 ? "#ffffff" : (i % 3 === 1 ? "#00f2fe" : "#b900ff");
+                        const p = new Particle(0, 0, color);
+                        p.vx = Math.cos(angle) * speed;
+                        p.vy = Math.sin(angle) * speed;
+                        p.radius = Math.random() * 5 + 2.5;
+                        p.decay = Math.random() * 0.015 + 0.005;
+                        this.worldParticles.push(p);
+                    }
+                }
+
+                if (sunNode) {
+                    sunNode.currentScale = 7.5 * (1.0 - t) + 0.15 * t;
+                }
+                
+                otherNodes.forEach(n => {
+                    n.currentScale = 0;
+                });
+            } else if (this.destructionTimer <= 5.0) {
+                // Phase 3: Black Hole slowly fades out
+                const t = (this.destructionTimer - 3.5) / 1.5; // 0 to 1
+                
+                if (sunNode) {
+                    sunNode.currentScale = 0.15 * (1.0 - t);
+                }
+                
+                otherNodes.forEach(n => {
+                    n.currentScale = 0;
+                });
+            } else {
+                // Complete!
+                this.destructionActive = false;
+                if (this.destructionCallback) {
+                    const cb = this.destructionCallback;
+                    this.destructionCallback = null;
+                    cb();
+                }
+            }
+        }
+
         // Smoothly animate zoom
         this._zoom += (this.targetZoom - this._zoom) * 8 * delta;
 
         // Actualizar el desplazamiento del centro si el panel lateral está abierto
-        if (this.sidebarElement && this.sidebarElement.classList.contains("open")) {
+        if (this.sidebarElement && this.sidebarElement.classList.contains("open") && !this.destructionActive) {
             const width = this.sidebarElement.offsetWidth || 800;
             // Centrado dentro del cuadrante libre (entre panel de control izquierdo y panel lateral derecho)
             const leftMargin = 90; // Ancho del panel de control izquierdo + margen
@@ -519,6 +669,7 @@ export class SpaceEngine {
 
         // Initialize and update parent rotations
         this.nodes.forEach(n => {
+            if (this.destructionActive) return;
             if (n.type !== "satellite") {
                 if (this.parentRotations[n.id] === undefined) {
                     this.parentRotations[n.id] = n.angle || Math.random() * Math.PI * 2;
@@ -538,6 +689,7 @@ export class SpaceEngine {
 
         // Update node scales smoothly
         this.nodes.forEach(n => {
+            if (this.destructionActive) return;
             const targetScale = this.getNodeScale(n);
             if (n.currentScale === undefined) {
                 n.currentScale = targetScale;
@@ -811,6 +963,20 @@ export class SpaceEngine {
         if (this.alienScanActive && this.drawUfoBeam) {
             shakeX = (Math.random() - 0.5) * 1.5;
             shakeY = (Math.random() - 0.5) * 1.5;
+        } else if (this.destructionActive) {
+            let shakeIntensity = 0;
+            if (this.destructionTimer <= 3.0) {
+                // Temblor leve que incrementa a medida que el sol se expande
+                shakeIntensity = (this.destructionTimer / 3.0) * 3.5;
+            } else if (this.destructionTimer <= 3.5) {
+                // Temblor violento durante el colapso / supernova
+                const t = (this.destructionTimer - 3.0) / 0.5;
+                shakeIntensity = 12.0 * (1.0 - t);
+            }
+            if (shakeIntensity > 0) {
+                shakeX = (Math.random() - 0.5) * shakeIntensity;
+                shakeY = (Math.random() - 0.5) * shakeIntensity;
+            }
         }
 
         this.ctx.translate(
@@ -818,6 +984,11 @@ export class SpaceEngine {
             this.canvas.height / 2 + this.centerShiftY + this.panY + shakeY
         );
         this.ctx.scale(this.zoom, this.zoom);
+
+        let destructionFade = 1.0;
+        if (this.destructionActive) {
+            destructionFade = Math.max(0, 1.0 - this.destructionTimer / 1.5);
+        }
 
         // Dibujar onda de escaneo de radar alíen
         if (this.scanPulseActive) {
@@ -869,8 +1040,10 @@ export class SpaceEngine {
                     const parentPos = this.getNodeAbsolutePosition(parentNode);
                     const depth = this.getDepth(node, this.currentParentId);
                     const scale = node.currentScale !== undefined ? node.currentScale : 1.0;
-                    let orbitRadius = this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale);
-                    if (parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined) {
+                    let orbitRadius = (this.destructionActive && node.destructionOrbitRadius !== undefined)
+                        ? node.destructionOrbitRadius
+                        : (this.getNodeBaseOrbitRadius(node) * Math.max(0.55, scale));
+                    if (parentNode.type !== "sun" && parentNode.orbitExpansion !== undefined && (!this.destructionActive || node.destructionOrbitRadius === undefined)) {
                         orbitRadius *= parentNode.orbitExpansion;
                     }
                     
@@ -913,14 +1086,17 @@ export class SpaceEngine {
                         lineWidth = Math.max(lineWidth * 1.3, 0.65);
                     }
                     
-                    this.ctx.strokeStyle = `rgba(0, 242, 254, ${opacity})`; 
-                    this.ctx.lineWidth = lineWidth;
-                    this.ctx.setLineDash(lineDash);
-                    
-                    this.ctx.beginPath();
-                    this.ctx.arc(parentPos.x, parentPos.y, orbitRadius, 0, Math.PI * 2);
-                    this.ctx.stroke();
-                    this.ctx.setLineDash([]);
+                    opacity *= destructionFade;
+                    if (opacity > 0) {
+                        this.ctx.strokeStyle = `rgba(0, 242, 254, ${opacity})`; 
+                        this.ctx.lineWidth = lineWidth;
+                        this.ctx.setLineDash(lineDash);
+                        
+                        this.ctx.beginPath();
+                        this.ctx.arc(parentPos.x, parentPos.y, orbitRadius, 0, Math.PI * 2);
+                        this.ctx.stroke();
+                        this.ctx.setLineDash([]);
+                    }
                 }
             }
         });
@@ -967,9 +1143,12 @@ export class SpaceEngine {
                         lineWidth = Math.max(lineWidth * 1.3, 0.5);
                     }
 
-                    this.ctx.strokeStyle = `rgba(0, 242, 254, ${opacity})`;
-                    this.ctx.lineWidth = lineWidth;
-                    this.ctx.stroke();
+                    opacity *= destructionFade;
+                    if (opacity > 0) {
+                        this.ctx.strokeStyle = `rgba(0, 242, 254, ${opacity})`;
+                        this.ctx.lineWidth = lineWidth;
+                        this.ctx.stroke();
+                    }
                 }
             }
         });
@@ -981,11 +1160,13 @@ export class SpaceEngine {
         );
 
         nodesToDraw.forEach(node => {
-            const pos = this.getNodeAbsolutePosition(node);
             const r = this.getNodeRadius(node);
+            if (r <= 0.1) return; // Evita errores de IndexSizeError al llamar a drawImage con dimensiones en 0 o negativas
 
-            // Dibujar brillo de atmósfera en 2D en el fondo
-            if (node.type !== "satellite") {
+            const pos = this.getNodeAbsolutePosition(node);
+
+            // Dibujar brillo de atmósfera en 2D en el fondo (evitar duplicado del sol en destrucción)
+            if (node.type !== "satellite" && (!this.destructionActive || node.type !== "sun")) {
                 const baseColor = this.getNodeColor(node);
                 const rgb = this.hexToRgb(baseColor);
                 
@@ -1024,8 +1205,10 @@ export class SpaceEngine {
             }
 
             // Renderizar con motor 3D si está disponible, sino usar fallback 2D
+            // Para la destrucción, solo forzamos 2D en el sol para poder dibujar el agujero negro.
             let rendered3D = false;
-            if (this.renderer3d) {
+            const force2D = this.destructionActive && node.type === "sun";
+            if (this.renderer3d && !force2D) {
                 try {
                     this.renderer3d.renderNode(this.ctx, pos.x, pos.y, r, node, sunDirection, time);
                     rendered3D = true;
@@ -1036,7 +1219,11 @@ export class SpaceEngine {
             
             if (!rendered3D) {
                 if (node.type === "sun") {
-                    this.drawHudSun(pos.x, pos.y, r, time);
+                    if (this.destructionActive && this.destructionTimer > 3.0) {
+                        this.drawBlackHole(pos.x, pos.y, r, time, this.destructionTimer);
+                    } else {
+                        this.drawHudSun(pos.x, pos.y, r, time, this.destructionActive ? this.destructionTimer : null);
+                    }
                 } else if (node.type === "planet") {
                     this.drawHudPlanet(node, pos.x, pos.y, r, time);
                 } else if (node.type === "planetoid") {
@@ -1049,9 +1236,9 @@ export class SpaceEngine {
             }
 
             // Marcador de Selección / Hover HUD / Coincidencia de Búsqueda
-            const isSelected = this.selectedNode && this.selectedNode.id === node.id;
-            const isHovered = this.hoveredNode && this.hoveredNode.id === node.id;
-            const isSearchMatch = node.isSearchMatch;
+            const isSelected = !this.destructionActive && this.selectedNode && this.selectedNode.id === node.id;
+            const isHovered = !this.destructionActive && this.hoveredNode && this.hoveredNode.id === node.id;
+            const isSearchMatch = !this.destructionActive && node.isSearchMatch;
             
             if (isSelected || isHovered) {
                 this.drawTargetReticle(pos.x, pos.y, r, time, isSelected);
@@ -1078,6 +1265,10 @@ export class SpaceEngine {
             } else if (isChildOfSelected || isParentOfSelected || isChildOfHovered || isDefaultVisible) {
                 // Apply a basic screen size check to avoid cluttering at extreme zoom-out
                 showLabel = screenRadius >= 6;
+            }
+            
+            if (this.destructionActive) {
+                showLabel = false;
             }
             
             if (showLabel) {
@@ -1152,6 +1343,25 @@ export class SpaceEngine {
             this.drawAlienUFO(this.ctx, this.alienScanUfoPos.x, this.alienScanUfoPos.y, time);
         }
 
+        // Dibujar partículas en espacio del mundo
+        this.worldParticles.forEach(p => p.draw(this.ctx));
+
+        // Dibujar onda expansiva de la supernova si corresponde
+        if (this.destructionActive && this.destructionTimer > 3.0 && this.destructionTimer < 4.2) {
+            const t = (this.destructionTimer - 3.0) / 1.2; // La onda expansiva dura 1.2s
+            const radius = t * 900;
+            const opacity = 1.0 - t;
+            this.ctx.save();
+            this.ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+            this.ctx.lineWidth = 6 * (1.0 - t);
+            this.ctx.shadowBlur = 20 * (1.0 - t);
+            this.ctx.shadowColor = "#00f2fe";
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.restore();
+        }
+
         this.ctx.restore(); // Restaurar Cámara (Mundo)
 
         // 6. RENDERIZAR CAPA DE INTERFAZ (Pantalla Completa)
@@ -1181,16 +1391,47 @@ export class SpaceEngine {
         ctx.restore();
     }
 
-    drawHudSun(x, y, r, time) {
+    drawHudSun(x, y, r, time, destructionTimer = null) {
         this.ctx.save();
         this.ctx.translate(x, y);
 
+        // Define colors and gradients, shift to deep red/orange if expanding as red giant
+        let coronaColor0 = "rgba(255, 180, 0, 0.5)";
+        let coronaColor1 = "rgba(255, 120, 0, 0.25)";
+        let coronaColor2 = "rgba(255, 60, 0, 0.08)";
+        let coronaColor3 = "rgba(255, 40, 0, 0)";
+        
+        let innerGlowColor0 = "rgba(255, 255, 200, 0.6)";
+        let innerGlowColor1 = "rgba(255, 180, 0, 0)";
+        
+        let sunColor0 = "#fffde7";
+        let sunColor1 = "#ffcc02";
+        let sunColor2 = "#ff8f00";
+        let sunColor3 = "#bf360c";
+        
+        if (destructionTimer !== null && destructionTimer <= 3.0) {
+            const t = destructionTimer / 3.0;
+            // Desplazar hacia colores de gigante roja
+            coronaColor0 = `rgba(${Math.floor(255)}, ${Math.floor(80 * (1 - t) + 10 * t)}, 0, 0.65)`;
+            coronaColor1 = `rgba(${Math.floor(255)}, ${Math.floor(40 * (1 - t) + 5 * t)}, 0, 0.38)`;
+            coronaColor2 = `rgba(${Math.floor(200)}, 0, 0, 0.15)`;
+            coronaColor3 = "rgba(100, 0, 0, 0)";
+            
+            innerGlowColor0 = `rgba(255, ${Math.floor(180 * (1 - t) + 40 * t)}, 0, 0.65)`;
+            innerGlowColor1 = "rgba(150, 0, 0, 0)";
+            
+            sunColor0 = `rgb(255, ${Math.floor(250 * (1 - t) + 80 * t)}, ${Math.floor(230 * (1 - t) + 20 * t)})`;
+            sunColor1 = `rgb(255, ${Math.floor(200 * (1 - t) + 40 * t)}, 0)`;
+            sunColor2 = `rgb(${Math.floor(255 * (1 - t) + 180 * t)}, ${Math.floor(100 * (1 - t))}, 0)`;
+            sunColor3 = `rgb(${Math.floor(191 * (1 - t) + 100 * t)}, 0, 0)`;
+        }
+
         // 1. Outer corona glow (reduced radius)
         const coronaGrad = this.ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 1.65);
-        coronaGrad.addColorStop(0, "rgba(255, 180, 0, 0.5)");
-        coronaGrad.addColorStop(0.3, "rgba(255, 120, 0, 0.25)");
-        coronaGrad.addColorStop(0.7, "rgba(255, 60, 0, 0.08)");
-        coronaGrad.addColorStop(1, "rgba(255, 40, 0, 0)");
+        coronaGrad.addColorStop(0, coronaColor0);
+        coronaGrad.addColorStop(0.3, coronaColor1);
+        coronaGrad.addColorStop(0.7, coronaColor2);
+        coronaGrad.addColorStop(1, coronaColor3);
         this.ctx.fillStyle = coronaGrad;
         this.ctx.beginPath();
         this.ctx.arc(0, 0, r * 1.65, 0, Math.PI * 2);
@@ -1198,8 +1439,8 @@ export class SpaceEngine {
 
         // 2. Inner hot glow (reduced radius)
         const innerGlow = this.ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.2);
-        innerGlow.addColorStop(0, "rgba(255, 255, 200, 0.6)");
-        innerGlow.addColorStop(1, "rgba(255, 180, 0, 0)");
+        innerGlow.addColorStop(0, innerGlowColor0);
+        innerGlow.addColorStop(1, innerGlowColor1);
         this.ctx.fillStyle = innerGlow;
         this.ctx.beginPath();
         this.ctx.arc(0, 0, r * 1.2, 0, Math.PI * 2);
@@ -1213,10 +1454,10 @@ export class SpaceEngine {
 
         // Base warm orange-yellow sphere
         const sunBase = this.ctx.createRadialGradient(-r * 0.25, -r * 0.25, 0, r * 0.15, r * 0.15, r * 1.1);
-        sunBase.addColorStop(0, "#fffde7");
-        sunBase.addColorStop(0.25, "#ffcc02");
-        sunBase.addColorStop(0.6, "#ff8f00");
-        sunBase.addColorStop(1, "#bf360c");
+        sunBase.addColorStop(0, sunColor0);
+        sunBase.addColorStop(0.25, sunColor1);
+        sunBase.addColorStop(0.6, sunColor2);
+        sunBase.addColorStop(1, sunColor3);
         this.ctx.fillStyle = sunBase;
         this.ctx.fillRect(-r, -r, r * 2, r * 2);
 
@@ -1247,6 +1488,61 @@ export class SpaceEngine {
         this.ctx.fillStyle = specGrad;
         this.ctx.beginPath();
         this.ctx.arc(-r * 0.3, -r * 0.35, r * 0.55, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.restore();
+    }
+
+    drawBlackHole(x, y, r, time, timer) {
+        this.ctx.save();
+        this.ctx.translate(x, y);
+
+        // Opacidad del agujero negro y del disco de acreción
+        let opacity = 1.0;
+        if (timer > 3.5) {
+            opacity = 1.0 - (timer - 3.5) / 1.5;
+        }
+
+        this.ctx.globalAlpha = opacity;
+
+        // 1. Disco de Acreción (elipse arremolinada y brillante)
+        const numRings = 4;
+        this.ctx.save();
+        this.ctx.rotate(time * 0.0003); // Rotación lenta
+        for (let i = 0; i < numRings; i++) {
+            const ringR = r * (1.8 + i * 0.4);
+            const ringOpacity = (0.5 - i * 0.1) * opacity;
+            const grad = this.ctx.createRadialGradient(0, 0, ringR * 0.8, 0, 0, ringR * 1.2);
+            grad.addColorStop(0, "rgba(0, 0, 0, 0)");
+            if (i % 2 === 0) {
+                grad.addColorStop(0.5, `rgba(185, 0, 255, ${ringOpacity})`); // Púrpura de neón
+            } else {
+                grad.addColorStop(0.5, `rgba(0, 242, 254, ${ringOpacity})`); // Cian de neón
+            }
+            grad.addColorStop(1, "rgba(0, 0, 0, 0)");
+            this.ctx.strokeStyle = grad;
+            this.ctx.lineWidth = r * 0.3;
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, 0, ringR, ringR * 0.35, Math.PI / 6, 0, Math.PI * 2);
+            this.ctx.stroke();
+        }
+        this.ctx.restore();
+
+        // 2. Anillo de Einstein (efecto de lente gravitacional brillante)
+        const lensGrad = this.ctx.createRadialGradient(0, 0, r * 0.9, 0, 0, r * 1.35);
+        lensGrad.addColorStop(0, "rgba(0, 0, 0, 1.0)");
+        lensGrad.addColorStop(0.3, "rgba(255, 255, 255, 0.85)"); // Anillo de Einstein brillante
+        lensGrad.addColorStop(0.7, "rgba(185, 0, 255, 0.35)"); // Halo púrpura
+        lensGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
+        this.ctx.fillStyle = lensGrad;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r * 1.35, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // 3. Horizonte de Sucesos (esfera negra sólida central)
+        this.ctx.fillStyle = "#000000";
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, r, 0, Math.PI * 2);
         this.ctx.fill();
 
         this.ctx.restore();
