@@ -1,4 +1,4 @@
-const CACHE_NAME = "orbimind-cache-v47";
+const CACHE_NAME = "orbimind-cache-v48";
 const ASSETS = [
   "index.html",
   "style.css",
@@ -79,7 +79,9 @@ self.addEventListener("fetch", (e) => {
           return networkResponse;
         })
         .catch(() => {
-          return caches.match(e.request, { ignoreSearch: true });
+          return caches.match(e.request, { ignoreSearch: true }).then((cachedResponse) => {
+            return cachedResponse || new Response("Not found", { status: 404 });
+          });
         })
     );
   }

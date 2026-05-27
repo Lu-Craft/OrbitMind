@@ -58,6 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     let currentSystemName = "";
     let orbitalHistory = [];
     let miniMapAnimationFrameId = null;
+    let activeSidebarTab = "edit";
 
     function renderMath(element) {
         if (typeof window.renderMathInElement === 'function' && element) {
@@ -692,7 +693,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         tabEdit.classList.add("active");
         tabPreview.classList.add("active");
-        switchTab("edit");
+        switchTab(activeSidebarTab);
         renderAttachmentsList();
 
         sidebar.classList.add("open");
@@ -738,6 +739,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     textNodeNotes.addEventListener("input", updateLiveMathPreview);
 
     function switchTab(tab) {
+        activeSidebarTab = tab;
         if (tab === "edit") {
             tabEdit.classList.add("active");
             tabPreview.classList.remove("active");

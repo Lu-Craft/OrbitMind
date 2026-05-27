@@ -2,7 +2,7 @@
 # Servidor web local ligero para ejecutar OrbiMind con soporte PWA completo.
 # Ejecuta este archivo en PowerShell.
 
-$port = 8002
+$port = 8003
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$port/")
 

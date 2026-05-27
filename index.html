@@ -3,6 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <script>
+        if (localStorage.getItem("orbimind_version_force") !== "48") {
+            localStorage.setItem("orbimind_version_force", "48");
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    var promises = [];
+                    for (var i = 0; i < registrations.length; i++) {
+                        promises.push(registrations[i].unregister());
+                    }
+                    Promise.all(promises).then(function() {
+                        if ('caches' in window) {
+                            caches.keys().then(function(names) {
+                                var cachePromises = [];
+                                for (var j = 0; j < names.length; j++) {
+                                    cachePromises.push(caches.delete(names[j]));
+                                }
+                                Promise.all(cachePromises).then(function() {
+                                    window.location.reload(true);
+                                });
+                            });
+                        } else {
+                            window.location.reload(true);
+                        }
+                    });
+                });
+            }
+        }
         window.onerror = function(message, source, lineno, colno, error) {
             var errDiv = document.createElement('div');
             errDiv.style.position = 'fixed';
@@ -53,7 +79,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-    <link rel="stylesheet" href="style.css?v=44">
+    <link rel="stylesheet" href="style.css?v=48">
     <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -547,11 +573,11 @@
 
     <!-- Scripts -->
     <script src="three.min.js" onerror="this.src='https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'"></script>
-    <script type="module" src="js/main.js?v=47"></script>
+    <script type="module" src="js/main.js?v=48"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=47')
+                navigator.serviceWorker.register('sw.js?v=48')
                     .then(reg => console.log('Service Worker registered:', reg))
                     .catch(err => console.error('Service Worker registration failed:', err));
             });
